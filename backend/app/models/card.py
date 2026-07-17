@@ -48,3 +48,9 @@ class Card(Base):
         "CubeCard",
         back_populates="card",
     )
+
+    inventory = relationship(
+        "InventoryItem",
+        back_populates="card",
+        uselist=False,
+    )
