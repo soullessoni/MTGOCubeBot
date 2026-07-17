@@ -1,6 +1,7 @@
 from sqlalchemy import String
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
+from sqlalchemy.orm import relationship
 
 from app.db.base import Base
 
@@ -41,4 +42,9 @@ class Card(Base):
     collector_number: Mapped[str | None] = mapped_column(
         String(20),
         nullable=True,
+    )
+
+    cube_cards = relationship(
+        "CubeCard",
+        back_populates="card",
     )
