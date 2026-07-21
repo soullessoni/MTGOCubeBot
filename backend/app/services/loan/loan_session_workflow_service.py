@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from app.models.loan_assignment import LoanAssignment
 from app.models.loan_session import LoanSession
 from app.services.loan.loan_session_status_service import (
     LoanSessionStatusService,
@@ -53,6 +54,23 @@ class LoanSessionWorkflowService:
         self.db.refresh(session)
 
         return session
+
+    def return_card(
+        self,
+        assignment: LoanAssignment,
+    ) -> LoanAssignment:
+
+        if assignment.status != "HANDED_OUT":
+            raise ValueError(
+                "Only HANDED_OUT assignments can be returned"
+            )
+
+        assignment.status = "RETURNED"
+
+        self.db.commit()
+        self.db.refresh(assignment)
+
+        return assignment
 
     def complete(
         self,

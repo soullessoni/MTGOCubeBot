@@ -181,3 +181,201 @@ def test_hand_out_is_persisted(db_session):
         refreshed.assignments[0].status
         == "HANDED_OUT"
     )
+
+    def test_return_card(db_session):
+        card = Card(
+            name="Black Lotus",
+        )
+
+        session = LoanSession(
+            status="IN_PROGRESS",
+        )
+
+        assignment = LoanAssignment(
+            card=card,
+            status="HANDED_OUT",
+            player_name="Alice",
+            quantity=1,
+        )
+
+        session.assignments.append(
+            assignment,
+        )
+
+        db_session.add(session)
+        db_session.commit()
+
+        service = LoanSessionWorkflowService(
+            db_session,
+        )
+
+        service.return_card(
+            assignment,
+        )
+
+        assert assignment.status == "RETURNED"
+
+    def test_cannot_return_created_card(db_session):
+        card = Card(
+            name="Black Lotus",
+        )
+
+        session = LoanSession(
+            status="IN_PROGRESS",
+        )
+
+        assignment = LoanAssignment(
+            card=card,
+            status="CREATED",
+            player_name="Alice",
+            quantity=1,
+        )
+
+        session.assignments.append(
+            assignment,
+        )
+
+        db_session.add(session)
+        db_session.commit()
+
+        service = LoanSessionWorkflowService(
+            db_session,
+        )
+
+        with pytest.raises(ValueError):
+            service.return_card(
+                assignment,
+            )
+
+    def test_cannot_return_twice(db_session):
+        card = Card(
+            name="Black Lotus",
+        )
+
+        session = LoanSession(
+            status="IN_PROGRESS",
+        )
+
+        assignment = LoanAssignment(
+            card=card,
+            status="RETURNED",
+            player_name="Alice",
+            quantity=1,
+        )
+
+        session.assignments.append(
+            assignment,
+        )
+
+        db_session.add(session)
+        db_session.commit()
+
+        service = LoanSessionWorkflowService(
+            db_session,
+        )
+
+        with pytest.raises(ValueError):
+            service.return_card(
+                assignment,
+            )
+def test_return_card(db_session):
+
+    card = Card(
+        name="Black Lotus",
+    )
+
+    session = LoanSession(
+        status="IN_PROGRESS",
+    )
+
+    assignment = LoanAssignment(
+        card=card,
+        status="HANDED_OUT",
+        player_name="Alice",
+        quantity=1,
+    )
+
+    session.assignments.append(
+        assignment,
+    )
+
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanSessionWorkflowService(
+        db_session,
+    )
+
+    service.return_card(
+        assignment,
+    )
+
+    assert assignment.status == "RETURNED"
+
+
+def test_cannot_return_created_card(db_session):
+
+    card = Card(
+        name="Black Lotus",
+    )
+
+    session = LoanSession(
+        status="IN_PROGRESS",
+    )
+
+    assignment = LoanAssignment(
+        card=card,
+        status="CREATED",
+        player_name="Alice",
+        quantity=1,
+    )
+
+    session.assignments.append(
+        assignment,
+    )
+
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanSessionWorkflowService(
+        db_session,
+    )
+
+    with pytest.raises(ValueError):
+        service.return_card(
+            assignment,
+        )
+
+
+def test_cannot_return_twice(db_session):
+
+    card = Card(
+        name="Black Lotus",
+    )
+
+    session = LoanSession(
+        status="IN_PROGRESS",
+    )
+
+    assignment = LoanAssignment(
+        card=card,
+        status="RETURNED",
+        player_name="Alice",
+        quantity=1,
+    )
+
+    session.assignments.append(
+        assignment,
+    )
+
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanSessionWorkflowService(
+        db_session,
+    )
+
+    with pytest.raises(ValueError):
+        service.return_card(
+            assignment,
+        )
