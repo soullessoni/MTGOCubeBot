@@ -18,6 +18,13 @@ from app.services.loan.loan_planning_service import (
 from app.use_cases.loan.create_loan_session import (
     CreateLoanSessionUseCase,
 )
+from app.models.loan_session import LoanSession
+from app.use_cases.loan.hand_out_loan_session import (
+    HandOutLoanSessionUseCase,
+)
+from app.services.loan.loan_session_workflow_service import (
+    LoanSessionWorkflowService,
+)
 
 
 router = APIRouter(
@@ -115,3 +122,38 @@ def get_loan_session(
         )
 
     return session
+
+@router.post(
+    "/{session_id}/hand-out",
+    response_model=LoanSessionResponse,
+)
+def hand_out_loan_session(
+    session_id: int,
+    db: Session = Depends(get_db),
+):
+
+    session = (
+        db.query(LoanSession)
+        .filter(
+            LoanSession.id == session_id
+        )
+        .first()
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Loan session not found",
+        )
+
+    workflow_service = LoanSessionWorkflowService(
+        db,
+    )
+
+    use_case = HandOutLoanSessionUseCase(
+        workflow_service,
+    )
+
+    return use_case.execute(
+        session,
+    )
