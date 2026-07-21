@@ -1,11 +1,10 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
 
-from app.models.card import Card
 
 class LoanAssignment(Base):
     __tablename__ = "loan_assignments"
@@ -22,15 +21,15 @@ class LoanAssignment(Base):
         nullable=False,
     )
 
-    card = relationship(
-        "Card",
-        back_populates="loan_assignments",
-    )
-
     card_id = Column(
         Integer,
         ForeignKey("cards.id"),
         nullable=False,
+    )
+
+    card = relationship(
+        "Card",
+        back_populates="loan_assignments",
     )
 
     player_name = Column(
@@ -53,7 +52,7 @@ class LoanAssignment(Base):
     created_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(UTC),
     )
 
     session = relationship(

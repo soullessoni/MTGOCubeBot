@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import Column, DateTime, Integer, String
 from sqlalchemy.orm import relationship
@@ -24,7 +24,7 @@ class LoanSession(Base):
     created_at = Column(
         DateTime,
         nullable=False,
-        default=datetime.utcnow,
+        default=lambda: datetime.now(UTC),
     )
 
     assignments = relationship(
