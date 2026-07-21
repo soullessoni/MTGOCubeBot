@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from app.api.loan.sessions import router as loan_sessions_router
+from app.api.loan import session_actions
 
 
 app = FastAPI(
@@ -12,6 +13,10 @@ app = FastAPI(
 
 app.include_router(
     loan_sessions_router,
+)
+
+app.include_router(
+    session_actions.router
 )
 
 
