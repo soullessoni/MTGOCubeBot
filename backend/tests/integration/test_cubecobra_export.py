@@ -1,10 +1,11 @@
 from pathlib import Path
+import pytest
 
 import httpx
 
 
+@pytest.mark.integration
 def test_download_mtgo_export():
-
     url = (
         "https://cubecobra.com/cube/download/mtgo/"
         "82f27ca5-58ff-4874-84da-7f8bc23e2073"
