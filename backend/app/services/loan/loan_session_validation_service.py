@@ -5,8 +5,11 @@ from app.models.loan_session import LoanSession
 
 @dataclass
 class LoanSessionValidationResult:
-    valid: bool
     errors: list[str]
+
+    @property
+    def valid(self) -> bool:
+        return len(self.errors) == 0
 
 
 class LoanSessionValidationService:
@@ -26,11 +29,9 @@ class LoanSessionValidationService:
         for assignment in session.assignments:
             if assignment.status != "CREATED":
                 errors.append(
-                    f"Assignment {assignment.id} "
-                    f"is not in CREATED state"
+                    "Loan session contains invalid assignment state"
                 )
 
         return LoanSessionValidationResult(
-            valid=len(errors) == 0,
             errors=errors,
         )

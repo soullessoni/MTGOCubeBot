@@ -66,3 +66,27 @@ def test_session_with_invalid_assignment_state():
 
     assert result.valid is False
     assert len(result.errors) == 1
+
+    def test_validation_result_valid_is_derived():
+        from app.services.loan.loan_session_validation_service import (
+            LoanSessionValidationResult,
+        )
+
+        result = LoanSessionValidationResult(
+            errors=[],
+        )
+
+        assert result.valid is True
+
+    def test_validation_result_invalid_is_derived():
+        from app.services.loan.loan_session_validation_service import (
+            LoanSessionValidationResult,
+        )
+
+        result = LoanSessionValidationResult(
+            errors=[
+                "error",
+            ],
+        )
+
+        assert result.valid is False
