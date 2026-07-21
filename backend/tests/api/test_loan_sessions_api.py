@@ -3,10 +3,9 @@ from app.models.inventory_item import InventoryItem
 
 
 def test_create_loan_session_api(
-    client,
-    db_session,
+        client,
+        db_session,
 ):
-
     card = Card(
         name="Black Lotus",
     )
@@ -46,6 +45,6 @@ def test_create_loan_session_api(
     assert data["status"] == "CREATED"
     assert len(data["assignments"]) == 1
     assert (
-        data["assignments"][0]["player_name"]
-        == "Alice"
+            data["assignments"][0]["player_name"]
+            == "Alice"
     )

@@ -1,9 +1,7 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-
 DATABASE_URL = "sqlite:///./cubebot.db"
-
 
 engine = create_engine(
     DATABASE_URL,
@@ -11,7 +9,6 @@ engine = create_engine(
         "check_same_thread": False,
     },
 )
-
 
 SessionLocal = sessionmaker(
     autocommit=False,

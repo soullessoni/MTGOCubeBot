@@ -4,10 +4,9 @@ from app.models.loan_session import LoanSession
 
 
 def test_return_loan_assignment_api(
-    client,
-    db_session,
+        client,
+        db_session,
 ):
-
     card = Card(
         name="Black Lotus",
     )
@@ -41,11 +40,11 @@ def test_return_loan_assignment_api(
 
     assert data["status"] == "RETURNED"
 
-def test_cannot_return_created_assignment(
-    client,
-    db_session,
-):
 
+def test_cannot_return_created_assignment(
+        client,
+        db_session,
+):
     card = Card(
         name="Black Lotus",
     )

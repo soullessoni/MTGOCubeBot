@@ -8,7 +8,6 @@ from app.services.loan.loan_session_status_service import (
 
 
 def test_mark_ready():
-
     session = LoanSession(
         status="CREATED",
     )
@@ -27,7 +26,6 @@ def test_mark_ready():
 
 
 def test_start():
-
     session = LoanSession(
         status="READY",
     )
@@ -40,7 +38,6 @@ def test_start():
 
 
 def test_complete():
-
     session = LoanSession(
         status="IN_PROGRESS",
     )
@@ -53,7 +50,6 @@ def test_complete():
 
 
 def test_invalid_transition():
-
     session = LoanSession(
         status="CREATED",
     )
@@ -65,7 +61,6 @@ def test_invalid_transition():
 
 
 def test_created_cannot_start_directly():
-
     session = LoanSession(
         status="CREATED",
     )
@@ -77,7 +72,6 @@ def test_created_cannot_start_directly():
 
 
 def test_ready_cannot_complete_directly():
-
     session = LoanSession(
         status="READY",
     )
@@ -89,7 +83,6 @@ def test_ready_cannot_complete_directly():
 
 
 def test_completed_cannot_restart():
-
     session = LoanSession(
         status="COMPLETED",
     )

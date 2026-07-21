@@ -7,7 +7,6 @@ from app.services.loan.loan_session_query_service import (
 
 
 def test_get_loan_session(db_session):
-
     card = Card(
         name="Black Lotus",
     )
@@ -47,7 +46,6 @@ def test_get_loan_session(db_session):
 
 
 def test_get_unknown_session_returns_none(db_session):
-
     service = LoanSessionQueryService(
         db_session,
     )

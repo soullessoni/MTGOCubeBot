@@ -15,8 +15,8 @@ class LoanSessionValidationResult:
 class LoanSessionValidationService:
 
     def validate(
-        self,
-        session: LoanSession,
+            self,
+            session: LoanSession,
     ) -> LoanSessionValidationResult:
 
         errors = []

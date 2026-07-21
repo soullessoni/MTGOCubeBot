@@ -22,7 +22,6 @@ class CubeCobraClient:
         return match.group(1)
 
     def download_mtgo_export(self) -> str:
-
         cube_id = self.extract_cube_id()
 
         export_url = (

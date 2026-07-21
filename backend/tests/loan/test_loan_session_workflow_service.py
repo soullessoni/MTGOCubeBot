@@ -9,7 +9,6 @@ from app.services.loan.loan_session_workflow_service import (
 
 
 def test_start_ready_session(db_session):
-
     session = LoanSession(
         status="READY",
     )
@@ -27,7 +26,6 @@ def test_start_ready_session(db_session):
 
 
 def test_cannot_start_created_session(db_session):
-
     session = LoanSession(
         status="CREATED",
     )
@@ -44,7 +42,6 @@ def test_cannot_start_created_session(db_session):
 
 
 def test_hand_out_assignments(db_session):
-
     card = Card(
         name="Black Lotus",
     )
@@ -74,13 +71,12 @@ def test_hand_out_assignments(db_session):
     service.hand_out(session)
 
     assert (
-        session.assignments[0].status
-        == "HANDED_OUT"
+            session.assignments[0].status
+            == "HANDED_OUT"
     )
 
 
 def test_complete_only_when_returned(db_session):
-
     session = LoanSession(
         status="IN_PROGRESS",
     )
@@ -112,7 +108,6 @@ def test_complete_only_when_returned(db_session):
 
 
 def test_cannot_complete_with_missing_return(db_session):
-
     session = LoanSession(
         status="IN_PROGRESS",
     )
@@ -143,7 +138,6 @@ def test_cannot_complete_with_missing_return(db_session):
 
 
 def test_hand_out_is_persisted(db_session):
-
     card = Card(
         name="Black Lotus",
     )
@@ -178,8 +172,8 @@ def test_hand_out_is_persisted(db_session):
     )
 
     assert (
-        refreshed.assignments[0].status
-        == "HANDED_OUT"
+            refreshed.assignments[0].status
+            == "HANDED_OUT"
     )
 
     def test_return_card(db_session):
@@ -278,8 +272,9 @@ def test_hand_out_is_persisted(db_session):
             service.return_card(
                 assignment,
             )
-def test_return_card(db_session):
 
+
+def test_return_card(db_session):
     card = Card(
         name="Black Lotus",
     )
@@ -314,7 +309,6 @@ def test_return_card(db_session):
 
 
 def test_cannot_return_created_card(db_session):
-
     card = Card(
         name="Black Lotus",
     )
@@ -348,7 +342,6 @@ def test_cannot_return_created_card(db_session):
 
 
 def test_cannot_return_twice(db_session):
-
     card = Card(
         name="Black Lotus",
     )

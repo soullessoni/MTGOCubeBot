@@ -2,7 +2,6 @@ from app.services.cube.cube_import_service import CubeImportService
 
 
 def test_full_cube_import(db_session):
-
     service = CubeImportService(
         db_session
     )

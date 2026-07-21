@@ -2,10 +2,9 @@ from app.models.loan_session import LoanSession
 
 
 def test_start_loan_session_api(
-    client,
-    db_session,
+        client,
+        db_session,
 ):
-
     session = LoanSession(
         status="READY",
     )
@@ -24,11 +23,11 @@ def test_start_loan_session_api(
 
     assert data["status"] == "IN_PROGRESS"
 
-def test_cannot_start_created_session(
-    client,
-    db_session,
-):
 
+def test_cannot_start_created_session(
+        client,
+        db_session,
+):
     session = LoanSession(
         status="CREATED",
     )

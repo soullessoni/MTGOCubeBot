@@ -6,7 +6,6 @@ from app.services.loan.loan_session_validation_service import (
 
 
 def test_valid_session():
-
     session = LoanSession(
         status="CREATED",
     )
@@ -26,7 +25,6 @@ def test_valid_session():
 
 
 def test_session_without_assignment():
-
     session = LoanSession(
         status="CREATED",
     )
@@ -37,13 +35,12 @@ def test_session_without_assignment():
 
     assert result.valid is False
     assert (
-        "Loan session has no assignments"
-        in result.errors
+            "Loan session has no assignments"
+            in result.errors
     )
 
 
 def test_session_with_invalid_assignment_state():
-
     session = LoanSession(
         status="CREATED",
     )
@@ -56,7 +53,7 @@ def test_session_with_invalid_assignment_state():
 
     session.assignments.append(
         LoanAssignment(
-            status="BORROWED",
+            status="HANDED_OUT",
         )
     )
 

@@ -1,5 +1,5 @@
-from app.services.inventory.inventory_service import InventoryService
 from app.models.card import Card
+from app.services.inventory.inventory_service import InventoryService
 
 
 def test_set_inventory_quantity(db_session):

@@ -4,10 +4,9 @@ from app.models.loan_session import LoanSession
 
 
 def test_complete_loan_session_api(
-    client,
-    db_session,
+        client,
+        db_session,
 ):
-
     card = Card(
         name="Black Lotus",
     )
@@ -39,11 +38,11 @@ def test_complete_loan_session_api(
 
     assert data["status"] == "COMPLETED"
 
-def test_cannot_complete_with_unreturned_cards(
-    client,
-    db_session,
-):
 
+def test_cannot_complete_with_unreturned_cards(
+        client,
+        db_session,
+):
     card = Card(
         name="Black Lotus",
     )

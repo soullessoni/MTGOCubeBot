@@ -1,13 +1,12 @@
 from app.models.card import Card
-from app.services.loan.loan_session_service import LoanSessionService
 from app.services.loan.loan_planning_service import (
     LoanPlanningResult,
     LoanRequest,
 )
+from app.services.loan.loan_session_service import LoanSessionService
 
 
 def test_create_loan_session(db_session):
-
     lotus = Card(
         name="Black Lotus",
     )

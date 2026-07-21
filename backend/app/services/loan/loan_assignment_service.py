@@ -24,10 +24,9 @@ class LoanAssignmentService:
         return assignment
 
     def mark_returned(
-        self,
-        assignment: LoanAssignment,
+            self,
+            assignment: LoanAssignment,
     ) -> LoanAssignment:
-
         self.status_service.mark_returned(
             assignment,
         )

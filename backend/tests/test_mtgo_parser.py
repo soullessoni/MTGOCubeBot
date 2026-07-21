@@ -2,7 +2,6 @@ from app.services.mtgo.parser import MTGOParser
 
 
 def test_parse_mtgo_export():
-
     content = """
     1 Black Lotus
     1 Ancestral Recall

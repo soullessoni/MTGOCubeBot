@@ -7,7 +7,6 @@ from app.services.mtgo.parser import CardEntry
 
 
 def test_create_cube(db_session):
-
     parsed_cards = [
         CardEntry(
             name="Black Lotus",
@@ -16,13 +15,12 @@ def test_create_cube(db_session):
     ]
 
     with patch(
-        "app.services.cube.cube_import_service.CubeCobraClient.download_mtgo_export",
-        return_value="fake export",
+            "app.services.cube.cube_import_service.CubeCobraClient.download_mtgo_export",
+            return_value="fake export",
     ), patch(
         "app.services.cube.cube_import_service.MTGOParser.parse",
         return_value=parsed_cards,
     ):
-
         service = CubeImportService(
             db_session
         )

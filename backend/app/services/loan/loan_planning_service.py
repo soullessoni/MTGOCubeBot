@@ -39,8 +39,8 @@ class LoanPlanningService:
         self.inventory = inventory_service
 
     def generate(
-        self,
-        pools: list[PlayerPool],
+            self,
+            pools: list[PlayerPool],
     ) -> LoanPlanningResult:
 
         requests = []

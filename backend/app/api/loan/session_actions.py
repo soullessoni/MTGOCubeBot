@@ -8,7 +8,6 @@ from app.services.loan.loan_session_status_service import (
     LoanSessionStatusService,
 )
 
-
 router = APIRouter(
     prefix="/loan/sessions",
     tags=["loan"],
@@ -20,10 +19,9 @@ router = APIRouter(
     response_model=LoanSessionResponse,
 )
 def mark_ready(
-    session_id: int,
-    db: Session = Depends(get_db),
+        session_id: int,
+        db: Session = Depends(get_db),
 ):
-
     session = (
         db.query(LoanSession)
         .filter(

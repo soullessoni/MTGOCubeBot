@@ -7,10 +7,9 @@ class LoanSessionQueryService:
         self.db = db
 
     def get(
-        self,
-        session_id: int,
+            self,
+            session_id: int,
     ) -> LoanSession | None:
-
         return (
             self.db.query(LoanSession)
             .filter(

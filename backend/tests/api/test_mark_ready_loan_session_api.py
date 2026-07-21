@@ -4,10 +4,9 @@ from app.models.loan_session import LoanSession
 
 
 def test_mark_ready_loan_session_api(
-    client,
-    db_session,
+        client,
+        db_session,
 ):
-
     card = Card(
         name="Black Lotus",
     )
@@ -39,20 +38,21 @@ def test_mark_ready_loan_session_api(
 
     assert data["status"] == "READY"
 
+
 def test_mark_ready_empty_session_fails(
-            client,
-            db_session,
-    ):
-        session = LoanSession(
-            status="CREATED",
-        )
+        client,
+        db_session,
+):
+    session = LoanSession(
+        status="CREATED",
+    )
 
-        db_session.add(session)
-        db_session.commit()
-        db_session.refresh(session)
+    db_session.add(session)
+    db_session.commit()
+    db_session.refresh(session)
 
-        response = client.post(
-            f"/loan/sessions/{session.id}/ready"
-        )
+    response = client.post(
+        f"/loan/sessions/{session.id}/ready"
+    )
 
-        assert response.status_code == 400
+    assert response.status_code == 400

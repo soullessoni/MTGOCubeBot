@@ -9,10 +9,9 @@ class InventoryService:
     def __init__(self, db: Session):
         self.db = db
 
-
     def get(
-        self,
-        card: Card,
+            self,
+            card: Card,
     ) -> InventoryItem | None:
 
         return (
@@ -23,10 +22,9 @@ class InventoryService:
             .first()
         )
 
-
     def get_quantity(
-        self,
-        card: Card,
+            self,
+            card: Card,
     ) -> int:
 
         item = self.get(card)
@@ -36,11 +34,10 @@ class InventoryService:
 
         return item.quantity
 
-
     def set_quantity(
-        self,
-        card: Card,
-        quantity: int,
+            self,
+            card: Card,
+            quantity: int,
     ):
 
         item = self.get(card)

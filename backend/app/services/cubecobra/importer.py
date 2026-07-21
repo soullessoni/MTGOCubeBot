@@ -6,7 +6,6 @@ class CubeCobraImporter:
     def __init__(self, url: str):
         self.url = url
 
-
     def fetch(self) -> str:
         response = httpx.get(
             self.url,

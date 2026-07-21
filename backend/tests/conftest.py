@@ -1,18 +1,16 @@
 import pytest
-
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-from fastapi.testclient import TestClient
 
 from app.db.base import Base
-from app.main import app
 from app.db.session import get_db
+from app.main import app
 
 
 @pytest.fixture
 def db_session():
-
     engine = create_engine(
         "sqlite://",
         connect_args={
@@ -39,7 +37,6 @@ def db_session():
 
 @pytest.fixture
 def client(db_session):
-
     def override_get_db():
         try:
             yield db_session

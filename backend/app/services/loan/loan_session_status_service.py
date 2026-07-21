@@ -5,7 +5,6 @@ from app.services.loan.loan_session_validation_service import (
 
 
 class LoanSessionStatusService:
-
     CREATED = "CREATED"
     READY = "READY"
     IN_PROGRESS = "IN_PROGRESS"
@@ -28,8 +27,8 @@ class LoanSessionStatusService:
         self.validation_service = LoanSessionValidationService()
 
     def mark_ready(
-        self,
-        session: LoanSession,
+            self,
+            session: LoanSession,
     ) -> LoanSession:
 
         validation = self.validation_service.validate(
@@ -47,8 +46,8 @@ class LoanSessionStatusService:
         )
 
     def start(
-        self,
-        session: LoanSession,
+            self,
+            session: LoanSession,
     ) -> LoanSession:
 
         return self._transition(
@@ -57,8 +56,8 @@ class LoanSessionStatusService:
         )
 
     def complete(
-        self,
-        session: LoanSession,
+            self,
+            session: LoanSession,
     ) -> LoanSession:
 
         return self._transition(
@@ -67,9 +66,9 @@ class LoanSessionStatusService:
         )
 
     def _transition(
-        self,
-        session: LoanSession,
-        new_status: str,
+            self,
+            session: LoanSession,
+            new_status: str,
     ) -> LoanSession:
 
         current_status = session.status

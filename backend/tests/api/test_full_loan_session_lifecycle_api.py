@@ -4,10 +4,9 @@ from app.models.loan_session import LoanSession
 
 
 def test_full_loan_session_lifecycle_api(
-    client,
-    db_session,
+        client,
+        db_session,
 ):
-
     card = Card(
         name="Black Lotus",
     )
@@ -42,7 +41,6 @@ def test_full_loan_session_lifecycle_api(
     assert response.status_code == 200
     assert response.json()["status"] == "READY"
 
-
     #
     # START
     #
@@ -52,7 +50,6 @@ def test_full_loan_session_lifecycle_api(
 
     assert response.status_code == 200
     assert response.json()["status"] == "IN_PROGRESS"
-
 
     #
     # HAND OUT
@@ -67,7 +64,6 @@ def test_full_loan_session_lifecycle_api(
 
     assert data["assignments"][0]["status"] == "HANDED_OUT"
 
-
     #
     # RETURN CARD
     #
@@ -79,7 +75,6 @@ def test_full_loan_session_lifecycle_api(
 
     assert response.status_code == 200
     assert response.json()["status"] == "RETURNED"
-
 
     #
     # COMPLETE

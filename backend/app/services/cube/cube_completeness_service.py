@@ -24,14 +24,14 @@ class CubeCheckResult:
 class CubeCompletenessService:
 
     def __init__(
-        self,
-        inventory_service: InventoryService,
+            self,
+            inventory_service: InventoryService,
     ):
         self.inventory = inventory_service
 
     def check(
-        self,
-        cube: Cube,
+            self,
+            cube: Cube,
     ) -> CubeCheckResult:
 
         missing_cards = []

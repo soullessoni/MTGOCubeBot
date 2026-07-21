@@ -21,7 +21,6 @@ class LoanSessionCreate(BaseModel):
 
 
 class LoanSessionResponse(BaseModel):
-
     id: int
     status: str
     created_at: datetime

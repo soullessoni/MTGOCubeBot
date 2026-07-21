@@ -6,8 +6,7 @@ from app.services.loan.loan_assignment_status_service import (
 )
 
 
-def test_mark_borrowed():
-
+def test_mark_handed_out():
     assignment = LoanAssignment(
         status="CREATED",
     )
@@ -18,8 +17,8 @@ def test_mark_borrowed():
 
     assert assignment.status == "HANDED_OUT"
 
-def test_mark_returned():
 
+def test_mark_returned():
     assignment = LoanAssignment(
         status="HANDED_OUT",
     )
@@ -32,7 +31,6 @@ def test_mark_returned():
 
 
 def test_invalid_transition():
-
     assignment = LoanAssignment(
         status="CREATED",
     )

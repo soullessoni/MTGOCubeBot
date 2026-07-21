@@ -9,7 +9,6 @@ from app.use_cases.loan.create_loan_session import (
 
 
 def test_create_session_from_plan(db_session):
-
     lotus = Card(
         name="Black Lotus",
     )
@@ -47,6 +46,6 @@ def test_create_session_from_plan(db_session):
     ) == 2
 
     assert (
-        session.assignments[0].player_name
-        == "Alice"
+            session.assignments[0].player_name
+            == "Alice"
     )

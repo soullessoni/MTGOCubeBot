@@ -1,5 +1,5 @@
-from app.models.loan_session import LoanSession
 from app.models.loan_assignment import LoanAssignment
+from app.models.loan_session import LoanSession
 from app.services.loan.loan_planning_service import LoanPlanningResult
 
 
@@ -9,8 +9,8 @@ class LoanSessionService:
         self.db = db
 
     def create_from_plan(
-        self,
-        plan: LoanPlanningResult,
+            self,
+            plan: LoanPlanningResult,
     ) -> LoanSession:
 
         if not plan.valid:

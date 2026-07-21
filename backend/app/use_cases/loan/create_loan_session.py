@@ -10,14 +10,14 @@ from app.services.loan.loan_planning_service import (
 class CreateLoanSessionUseCase:
 
     def __init__(
-        self,
-        db: Session,
+            self,
+            db: Session,
     ):
         self.db = db
 
     def execute(
-        self,
-        plan: LoanPlanningResult,
+            self,
+            plan: LoanPlanningResult,
     ) -> LoanSession:
 
         if plan.conflicts:
@@ -32,7 +32,6 @@ class CreateLoanSessionUseCase:
         for request in plan.requests:
 
             for card in request.requested_cards:
-
                 assignment = LoanAssignment(
                     card=card,
                     player_name=request.player_name,

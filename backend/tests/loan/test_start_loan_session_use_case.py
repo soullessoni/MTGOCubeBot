@@ -5,7 +5,6 @@ from app.use_cases.loan.start_loan_session import (
 
 
 def test_start_loan_session(db_session):
-
     session = LoanSession(
         status="CREATED",
     )
@@ -25,7 +24,6 @@ def test_start_loan_session(db_session):
 
 
 def test_cannot_start_started_session(db_session):
-
     session = LoanSession(
         status="STARTED",
     )

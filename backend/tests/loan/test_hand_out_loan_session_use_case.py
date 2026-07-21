@@ -10,7 +10,6 @@ from app.use_cases.loan.hand_out_loan_session import (
 
 
 def test_hand_out_loan_session(db_session):
-
     card = Card(
         name="Black Lotus",
     )

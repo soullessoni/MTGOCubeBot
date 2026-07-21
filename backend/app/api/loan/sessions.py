@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models.card import Card
+from app.models.loan_assignment import LoanAssignment
 from app.models.loan_session import LoanSession
 from app.schemas.loan.loan_session import (
     LoanSessionCreate,
@@ -15,21 +16,18 @@ from app.services.loan.loan_planning_service import (
     LoanPlanningService,
     PlayerPool,
 )
-from app.use_cases.loan.create_loan_session import (
-    CreateLoanSessionUseCase,
-)
-from app.models.loan_session import LoanSession
-from app.use_cases.loan.hand_out_loan_session import (
-    HandOutLoanSessionUseCase,
+from app.services.loan.loan_session_status_service import (
+    LoanSessionStatusService,
 )
 from app.services.loan.loan_session_workflow_service import (
     LoanSessionWorkflowService,
 )
-from app.services.loan.loan_session_status_service import (
-    LoanSessionStatusService,
+from app.use_cases.loan.create_loan_session import (
+    CreateLoanSessionUseCase,
 )
-from app.models.loan_assignment import LoanAssignment
-
+from app.use_cases.loan.hand_out_loan_session import (
+    HandOutLoanSessionUseCase,
+)
 
 router = APIRouter(
     prefix="/loan/sessions",
@@ -42,10 +40,9 @@ router = APIRouter(
     response_model=LoanSessionResponse,
 )
 def create_loan_session(
-    payload: LoanSessionCreate,
-    db: Session = Depends(get_db),
+        payload: LoanSessionCreate,
+        db: Session = Depends(get_db),
 ):
-
     pools = []
 
     for player in payload.players:
@@ -79,7 +76,6 @@ def create_loan_session(
             )
         )
 
-
     inventory_service = InventoryService(
         db
     )
@@ -102,15 +98,15 @@ def create_loan_session(
 
     return session
 
+
 @router.get(
     "/{session_id}",
     response_model=LoanSessionResponse,
 )
 def get_loan_session(
-    session_id: int,
-    db: Session = Depends(get_db),
+        session_id: int,
+        db: Session = Depends(get_db),
 ):
-
     session = (
         db.query(LoanSession)
         .filter(
@@ -127,15 +123,15 @@ def get_loan_session(
 
     return session
 
+
 @router.post(
     "/{session_id}/ready",
     response_model=LoanSessionResponse,
 )
 def mark_ready_loan_session(
-    session_id: int,
-    db: Session = Depends(get_db),
+        session_id: int,
+        db: Session = Depends(get_db),
 ):
-
     session = (
         db.query(LoanSession)
         .filter(
@@ -167,15 +163,15 @@ def mark_ready_loan_session(
 
     return session
 
+
 @router.post(
     "/{session_id}/hand-out",
     response_model=LoanSessionResponse,
 )
 def hand_out_loan_session(
-    session_id: int,
-    db: Session = Depends(get_db),
+        session_id: int,
+        db: Session = Depends(get_db),
 ):
-
     session = (
         db.query(LoanSession)
         .filter(
@@ -202,15 +198,15 @@ def hand_out_loan_session(
         session,
     )
 
+
 @router.post(
     "/{session_id}/start",
     response_model=LoanSessionResponse,
 )
 def start_loan_session(
-    session_id: int,
-    db: Session = Depends(get_db),
+        session_id: int,
+        db: Session = Depends(get_db),
 ):
-
     session = (
         db.query(LoanSession)
         .filter(
@@ -243,15 +239,15 @@ def start_loan_session(
 
     return session
 
+
 @router.post(
     "/{session_id}/complete",
     response_model=LoanSessionResponse,
 )
 def complete_loan_session(
-    session_id: int,
-    db: Session = Depends(get_db),
+        session_id: int,
+        db: Session = Depends(get_db),
 ):
-
     session = (
         db.query(LoanSession)
         .filter(
@@ -283,14 +279,14 @@ def complete_loan_session(
 
     return session
 
+
 @router.post(
     "/assignments/{assignment_id}/return",
 )
 def return_loan_assignment(
-    assignment_id: int,
-    db: Session = Depends(get_db),
+        assignment_id: int,
+        db: Session = Depends(get_db),
 ):
-
     assignment = (
         db.query(LoanAssignment)
         .filter(

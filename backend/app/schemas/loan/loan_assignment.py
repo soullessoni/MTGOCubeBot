@@ -4,7 +4,6 @@ from pydantic import BaseModel
 
 
 class LoanAssignmentResponse(BaseModel):
-
     id: int
     card_id: int
     player_name: str

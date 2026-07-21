@@ -1,13 +1,12 @@
 from app.models.card import Card
-from app.models.loan_session import LoanSession
 from app.models.loan_assignment import LoanAssignment
+from app.models.loan_session import LoanSession
 
 
 def test_get_loan_session_api(
-    client,
-    db_session,
+        client,
+        db_session,
 ):
-
     card = Card(
         name="Black Lotus",
     )

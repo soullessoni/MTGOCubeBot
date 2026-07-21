@@ -10,7 +10,6 @@ from app.use_cases.loan.complete_loan_session import (
 
 
 def test_complete_loan_session(db_session):
-
     card = Card(
         name="Black Lotus",
     )

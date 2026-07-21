@@ -10,11 +10,10 @@ class CubeImportService:
     def __init__(self, db: Session):
         self.db = db
 
-
     def import_cube(
-        self,
-        cube_url: str,
-        name: str,
+            self,
+            cube_url: str,
+            name: str,
     ) -> Cube:
 
         client = CubeCobraClient(
@@ -29,7 +28,6 @@ class CubeImportService:
             export
         )
 
-
         cube = Cube(
             name=name,
             cubecobra_url=cube_url,
@@ -37,7 +35,6 @@ class CubeImportService:
 
         self.db.add(cube)
         self.db.flush()
-
 
         for entry in cards:
 
@@ -57,7 +54,6 @@ class CubeImportService:
                 self.db.add(card)
                 self.db.flush()
 
-
             cube_card = CubeCard(
                 cube_id=cube.id,
                 card_id=card.id,
@@ -65,7 +61,6 @@ class CubeImportService:
             )
 
             self.db.add(cube_card)
-
 
         self.db.commit()
         self.db.refresh(cube)

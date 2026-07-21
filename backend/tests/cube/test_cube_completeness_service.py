@@ -1,15 +1,14 @@
-from app.services.inventory.inventory_service import InventoryService
-from app.services.cube.cube_completeness_service import CubeCompletenessService
-
 from app.models.card import Card
 from app.models.cube import Cube
 from app.models.cube_card import CubeCard
+from app.services.cube.cube_completeness_service import CubeCompletenessService
+from app.services.inventory.inventory_service import InventoryService
 
 
 def create_cube_with_card(
-    db_session,
-    card_name,
-    quantity=1,
+        db_session,
+        card_name,
+        quantity=1,
 ):
     card = Card(name=card_name)
 

@@ -4,13 +4,14 @@ from app.services.loan.loan_planning_service import (
     PlayerPool,
 )
 
+
 class FakeInventory:
 
     def get_quantity(self, card):
         return 99
 
-def test_generate_loan_requests():
 
+def test_generate_loan_requests():
     lotus = Card(name="Black Lotus")
     bolt = Card(name="Lightning Bolt")
     ring = Card(name="Sol Ring")
@@ -34,7 +35,7 @@ def test_generate_loan_requests():
     service = LoanPlanningService(
         FakeInventory()
     )
-    
+
     result = service.generate(pools)
 
     assert result.valid

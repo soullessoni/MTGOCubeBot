@@ -7,9 +7,9 @@ Create Date: 2026-07-17 12:26:14.176455
 """
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'a306c8c4f11c'
@@ -24,6 +24,7 @@ def upgrade():
             "uq_cube_card",
             ["cube_id", "card_id"],
         )
+
 
 def downgrade():
     with op.batch_alter_table("cube_cards") as batch_op:

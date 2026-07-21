@@ -2,26 +2,27 @@ from sqlalchemy.orm import Session
 
 from app.models.loan_assignment import LoanAssignment
 from app.models.loan_session import LoanSession
-from app.services.loan.loan_session_status_service import (
-    LoanSessionStatusService,
-)
 from app.services.loan.loan_assignment_service import (
     LoanAssignmentService,
+)
+from app.services.loan.loan_session_status_service import (
+    LoanSessionStatusService,
 )
 
 
 class LoanSessionWorkflowService:
 
     def __init__(
-        self,
-        db: Session,
+            self,
+            db: Session,
     ):
         self.db = db
         self.status_service = LoanSessionStatusService()
         self.assignment_service = LoanAssignmentService(db)
+
     def start(
-        self,
-        session: LoanSession,
+            self,
+            session: LoanSession,
     ) -> LoanSession:
 
         result = self.status_service.start(
@@ -34,8 +35,8 @@ class LoanSessionWorkflowService:
         return result
 
     def hand_out(
-        self,
-        session: LoanSession,
+            self,
+            session: LoanSession,
     ) -> LoanSession:
 
         if session.status != "IN_PROGRESS":
@@ -60,8 +61,8 @@ class LoanSessionWorkflowService:
         return session
 
     def return_card(
-        self,
-        assignment: LoanAssignment,
+            self,
+            assignment: LoanAssignment,
     ) -> LoanAssignment:
 
         if assignment.status != "HANDED_OUT":
@@ -77,8 +78,8 @@ class LoanSessionWorkflowService:
         return assignment
 
     def complete(
-        self,
-        session: LoanSession,
+            self,
+            session: LoanSession,
     ) -> LoanSession:
 
         if session.status != "IN_PROGRESS":

@@ -6,8 +6,7 @@ from app.services.loan.loan_assignment_status_service import (
 )
 
 
-def test_created_can_be_borrowed():
-
+def test_created_can_be_handed_out():
     assignment = LoanAssignment(
         status="CREATED",
     )
@@ -18,8 +17,8 @@ def test_created_can_be_borrowed():
 
     assert assignment.status == "HANDED_OUT"
 
-def test_created_cannot_be_returned():
 
+def test_created_cannot_be_returned():
     assignment = LoanAssignment(
         status="CREATED",
     )
@@ -31,7 +30,6 @@ def test_created_cannot_be_returned():
 
 
 def test_handed_out_can_be_returned():
-
     assignment = LoanAssignment(
         status="HANDED_OUT",
     )
@@ -44,7 +42,6 @@ def test_handed_out_can_be_returned():
 
 
 def test_returned_cannot_be_handed_out():
-
     assignment = LoanAssignment(
         status="RETURNED",
     )
