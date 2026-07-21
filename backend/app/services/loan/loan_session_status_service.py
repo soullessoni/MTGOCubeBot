@@ -1,6 +1,6 @@
 from app.models.loan_session import LoanSession
-from app.services.loan.loan_session_readiness_service import (
-    LoanSessionReadinessService,
+from app.services.loan.loan_session_validation_service import (
+    LoanSessionValidationService,
 )
 
 
@@ -24,23 +24,22 @@ class LoanSessionStatusService:
         COMPLETED: [],
     }
 
-    def __init__(
-        self,
-        readiness_service: LoanSessionReadinessService | None = None,
-    ):
-        self.readiness_service = (
-            readiness_service
-            or LoanSessionReadinessService()
-        )
+    def __init__(self):
+        self.validation_service = LoanSessionValidationService()
 
     def mark_ready(
         self,
         session: LoanSession,
     ) -> LoanSession:
 
-        self.readiness_service.validate(
+        validation = self.validation_service.validate(
             session,
         )
+
+        if not validation.valid:
+            raise ValueError(
+                "; ".join(validation.errors)
+            )
 
         return self._transition(
             session,
@@ -51,6 +50,7 @@ class LoanSessionStatusService:
         self,
         session: LoanSession,
     ) -> LoanSession:
+
         return self._transition(
             session,
             self.IN_PROGRESS,
@@ -60,6 +60,7 @@ class LoanSessionStatusService:
         self,
         session: LoanSession,
     ) -> LoanSession:
+
         return self._transition(
             session,
             self.COMPLETED,

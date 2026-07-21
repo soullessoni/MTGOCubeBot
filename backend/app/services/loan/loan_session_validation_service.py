@@ -21,6 +21,11 @@ class LoanSessionValidationService:
 
         errors = []
 
+        if session.status == "COMPLETED":
+            errors.append(
+                "Completed session cannot become ready"
+            )
+
         if not session.assignments:
             errors.append(
                 "Loan session has no assignments"
@@ -29,7 +34,7 @@ class LoanSessionValidationService:
         for assignment in session.assignments:
             if assignment.status != "CREATED":
                 errors.append(
-                    "Loan session contains invalid assignment state"
+                    "Loan session contains invalid assignments"
                 )
 
         return LoanSessionValidationResult(
