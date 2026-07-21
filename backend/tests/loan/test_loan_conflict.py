@@ -1,9 +1,9 @@
 from app.models.card import Card
-from app.services.loan_planning_service import (
+from app.services.loan.loan_planning_service import (
     LoanPlanningService,
     PlayerPool,
 )
-from app.services.inventory_service import InventoryService
+from app.services.inventory.inventory_service import InventoryService
 
 class FakeInventory:
 

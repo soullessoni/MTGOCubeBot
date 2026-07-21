@@ -1,4 +1,4 @@
-from app.services.inventory_service import InventoryService
+from app.services.inventory.inventory_service import InventoryService
 from app.models.card import Card
 
 

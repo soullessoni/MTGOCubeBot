@@ -1,4 +1,4 @@
-from app.services.cube_import_service import CubeImportService
+from app.services.cube.cube_import_service import CubeImportService
 
 
 def test_create_cube(db_session):

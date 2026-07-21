@@ -1,7 +1,7 @@
 from app.models.card import Card
 from app.models.loan_assignment import LoanAssignment
 from app.models.loan_session import LoanSession
-from app.services.loan_assignment_service import LoanAssignmentService
+from app.services.loan.loan_assignment_service import LoanAssignmentService
 
 
 def test_mark_assignment_status(db_session):

@@ -1,6 +1,6 @@
 from app.models.card import Card
-from app.services.loan_session_service import LoanSessionService
-from app.services.loan_planning_service import (
+from app.services.loan.loan_session_service import LoanSessionService
+from app.services.loan.loan_planning_service import (
     LoanPlanningResult,
     LoanRequest,
 )

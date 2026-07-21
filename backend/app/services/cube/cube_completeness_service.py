@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from app.models import Card, Cube
-from app.services.inventory_service import InventoryService
+from app.services.inventory.inventory_service import InventoryService
 
 
 @dataclass(slots=True)

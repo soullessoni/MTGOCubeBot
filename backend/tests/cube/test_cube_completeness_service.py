@@ -1,5 +1,5 @@
-from app.services.inventory_service import InventoryService
-from app.services.cube_completeness_service import CubeCompletenessService
+from app.services.inventory.inventory_service import InventoryService
+from app.services.cube.cube_completeness_service import CubeCompletenessService
 
 from app.models.card import Card
 from app.models.cube import Cube

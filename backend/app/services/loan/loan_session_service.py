@@ -1,6 +1,6 @@
 from app.models.loan_session import LoanSession
 from app.models.loan_assignment import LoanAssignment
-from app.services.loan_planning_service import LoanPlanningResult
+from app.services.loan.loan_planning_service import LoanPlanningResult
 
 
 class LoanSessionService:
