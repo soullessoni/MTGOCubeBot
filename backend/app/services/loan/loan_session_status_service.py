@@ -1,4 +1,7 @@
 from app.models.loan_session import LoanSession
+from app.services.loan.loan_session_readiness_service import (
+    LoanSessionReadinessService,
+)
 
 
 class LoanSessionStatusService:
@@ -21,10 +24,24 @@ class LoanSessionStatusService:
         COMPLETED: [],
     }
 
+    def __init__(
+        self,
+        readiness_service: LoanSessionReadinessService | None = None,
+    ):
+        self.readiness_service = (
+            readiness_service
+            or LoanSessionReadinessService()
+        )
+
     def mark_ready(
         self,
         session: LoanSession,
     ) -> LoanSession:
+
+        self.readiness_service.validate(
+            session,
+        )
+
         return self._transition(
             session,
             self.READY,

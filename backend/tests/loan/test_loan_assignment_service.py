@@ -35,8 +35,8 @@ def test_mark_assignment_status(db_session):
         assignment,
     )
 
-    assert assignment.status == "HANDED_OUT"
-
+    assert assignment.status == "BORROWED"
+    
     service.mark_returned(
         assignment,
     )

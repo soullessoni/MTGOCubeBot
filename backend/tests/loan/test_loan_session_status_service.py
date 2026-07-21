@@ -1,13 +1,22 @@
+from app.models.loan_assignment import LoanAssignment
 from app.models.loan_session import LoanSession
 from app.services.loan.loan_session_status_service import (
     LoanSessionStatusService,
 )
+
+import pytest
 
 
 def test_mark_ready():
 
     session = LoanSession(
         status="CREATED",
+    )
+
+    session.assignments.append(
+        LoanAssignment(
+            status="CREATED",
+        )
     )
 
     service = LoanSessionStatusService()
@@ -51,9 +60,17 @@ def test_invalid_transition():
 
     service = LoanSessionStatusService()
 
-    try:
+    with pytest.raises(ValueError):
         service.complete(session)
-    except ValueError:
-        assert True
-    else:
-        assert False, "Expected ValueError"
+
+
+def test_mark_ready_requires_assignments():
+
+    session = LoanSession(
+        status="CREATED",
+    )
+
+    service = LoanSessionStatusService()
+
+    with pytest.raises(ValueError):
+        service.mark_ready(session)

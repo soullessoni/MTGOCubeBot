@@ -1,17 +1,23 @@
 from app.models.loan_assignment import LoanAssignment
+from app.services.loan.loan_assignment_status_service import (
+    LoanAssignmentStatusService,
+)
 
 
 class LoanAssignmentService:
 
     def __init__(self, db):
         self.db = db
+        self.status_service = LoanAssignmentStatusService()
 
     def mark_handed_out(
         self,
         assignment: LoanAssignment,
     ) -> LoanAssignment:
 
-        assignment.status = "HANDED_OUT"
+        self.status_service.mark_borrowed(
+            assignment,
+        )
 
         self.db.commit()
         self.db.refresh(assignment)
@@ -23,7 +29,9 @@ class LoanAssignmentService:
         assignment: LoanAssignment,
     ) -> LoanAssignment:
 
-        assignment.status = "RETURNED"
+        self.status_service.mark_returned(
+            assignment,
+        )
 
         self.db.commit()
         self.db.refresh(assignment)
