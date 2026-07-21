@@ -74,3 +74,33 @@ def test_mark_ready_requires_assignments():
 
     with pytest.raises(ValueError):
         service.mark_ready(session)
+
+        def test_created_cannot_start_directly():
+            session = LoanSession(
+                status="CREATED",
+            )
+
+            service = LoanSessionStatusService()
+
+            with pytest.raises(ValueError):
+                service.start(session)
+
+        def test_ready_cannot_complete_directly():
+            session = LoanSession(
+                status="READY",
+            )
+
+            service = LoanSessionStatusService()
+
+            with pytest.raises(ValueError):
+                service.complete(session)
+
+        def test_completed_cannot_restart():
+            session = LoanSession(
+                status="COMPLETED",
+            )
+
+            service = LoanSessionStatusService()
+
+            with pytest.raises(ValueError):
+                service.start(session)
