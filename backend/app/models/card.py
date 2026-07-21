@@ -54,3 +54,8 @@ class Card(Base):
         back_populates="card",
         uselist=False,
     )
+
+    loan_assignments = relationship(
+        "LoanAssignment",
+        back_populates="card",
+    )
