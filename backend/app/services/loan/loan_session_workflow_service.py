@@ -5,6 +5,9 @@ from app.models.loan_session import LoanSession
 from app.services.loan.loan_session_status_service import (
     LoanSessionStatusService,
 )
+from app.services.loan.loan_assignment_service import (
+    LoanAssignmentService,
+)
 
 
 class LoanSessionWorkflowService:
@@ -15,7 +18,7 @@ class LoanSessionWorkflowService:
     ):
         self.db = db
         self.status_service = LoanSessionStatusService()
-
+        self.assignment_service = LoanAssignmentService(db)
     def start(
         self,
         session: LoanSession,
@@ -48,8 +51,9 @@ class LoanSessionWorkflowService:
                 )
 
         for assignment in session.assignments:
-            assignment.status = "HANDED_OUT"
-
+            self.assignment_service.mark_handed_out(
+                assignment
+            )
         self.db.commit()
         self.db.refresh(session)
 

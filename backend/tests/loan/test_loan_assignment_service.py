@@ -14,10 +14,9 @@ def test_created_can_be_borrowed():
 
     service = LoanAssignmentStatusService()
 
-    service.mark_borrowed(assignment)
+    service.mark_handed_out(assignment)
 
-    assert assignment.status == "BORROWED"
-
+    assert assignment.status == "HANDED_OUT"
 
 def test_created_cannot_be_returned():
 
@@ -31,10 +30,10 @@ def test_created_cannot_be_returned():
         service.mark_returned(assignment)
 
 
-def test_borrowed_can_be_returned():
+def test_handed_out_can_be_returned():
 
     assignment = LoanAssignment(
-        status="BORROWED",
+        status="HANDED_OUT",
     )
 
     service = LoanAssignmentStatusService()
@@ -44,7 +43,7 @@ def test_borrowed_can_be_returned():
     assert assignment.status == "RETURNED"
 
 
-def test_returned_cannot_be_borrowed():
+def test_returned_cannot_be_handed_out():
 
     assignment = LoanAssignment(
         status="RETURNED",
@@ -53,4 +52,4 @@ def test_returned_cannot_be_borrowed():
     service = LoanAssignmentStatusService()
 
     with pytest.raises(ValueError):
-        service.mark_borrowed(assignment)
+        service.mark_handed_out(assignment)

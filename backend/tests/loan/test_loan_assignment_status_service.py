@@ -14,15 +14,14 @@ def test_mark_borrowed():
 
     service = LoanAssignmentStatusService()
 
-    service.mark_borrowed(assignment)
+    service.mark_handed_out(assignment)
 
-    assert assignment.status == "BORROWED"
-
+    assert assignment.status == "HANDED_OUT"
 
 def test_mark_returned():
 
     assignment = LoanAssignment(
-        status="BORROWED",
+        status="HANDED_OUT",
     )
 
     service = LoanAssignmentStatusService()

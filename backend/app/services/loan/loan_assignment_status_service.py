@@ -1,30 +1,27 @@
-from app.models.loan_assignment import LoanAssignment
-
-
 class LoanAssignmentStatusService:
 
     CREATED = "CREATED"
-    BORROWED = "BORROWED"
+    HANDED_OUT = "HANDED_OUT"
     RETURNED = "RETURNED"
 
     ALLOWED_TRANSITIONS = {
         CREATED: [
-            BORROWED,
+            HANDED_OUT,
         ],
-        BORROWED: [
+        HANDED_OUT: [
             RETURNED,
         ],
         RETURNED: [],
     }
 
-    def mark_borrowed(
+    def mark_handed_out(
         self,
         assignment: LoanAssignment,
     ) -> LoanAssignment:
 
         return self._transition(
             assignment,
-            self.BORROWED,
+            self.HANDED_OUT,
         )
 
     def mark_returned(

@@ -11,11 +11,10 @@ class LoanAssignmentService:
         self.status_service = LoanAssignmentStatusService()
 
     def mark_handed_out(
-        self,
-        assignment: LoanAssignment,
+            self,
+            assignment: LoanAssignment,
     ) -> LoanAssignment:
-
-        self.status_service.mark_borrowed(
+        self.status_service.mark_handed_out(
             assignment,
         )
 
