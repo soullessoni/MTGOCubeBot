@@ -1,10 +1,10 @@
+import pytest
+
 from app.models.loan_assignment import LoanAssignment
 from app.models.loan_session import LoanSession
 from app.services.loan.loan_session_status_service import (
     LoanSessionStatusService,
 )
-
-import pytest
 
 
 def test_mark_ready():
@@ -64,7 +64,7 @@ def test_invalid_transition():
         service.complete(session)
 
 
-def test_mark_ready_requires_assignments():
+def test_created_cannot_start_directly():
 
     session = LoanSession(
         status="CREATED",
@@ -73,34 +73,28 @@ def test_mark_ready_requires_assignments():
     service = LoanSessionStatusService()
 
     with pytest.raises(ValueError):
-        service.mark_ready(session)
+        service.start(session)
 
-        def test_created_cannot_start_directly():
-            session = LoanSession(
-                status="CREATED",
-            )
 
-            service = LoanSessionStatusService()
+def test_ready_cannot_complete_directly():
 
-            with pytest.raises(ValueError):
-                service.start(session)
+    session = LoanSession(
+        status="READY",
+    )
 
-        def test_ready_cannot_complete_directly():
-            session = LoanSession(
-                status="READY",
-            )
+    service = LoanSessionStatusService()
 
-            service = LoanSessionStatusService()
+    with pytest.raises(ValueError):
+        service.complete(session)
 
-            with pytest.raises(ValueError):
-                service.complete(session)
 
-        def test_completed_cannot_restart():
-            session = LoanSession(
-                status="COMPLETED",
-            )
+def test_completed_cannot_restart():
 
-            service = LoanSessionStatusService()
+    session = LoanSession(
+        status="COMPLETED",
+    )
 
-            with pytest.raises(ValueError):
-                service.start(session)
+    service = LoanSessionStatusService()
+
+    with pytest.raises(ValueError):
+        service.start(session)
