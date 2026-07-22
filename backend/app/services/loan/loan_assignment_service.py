@@ -6,7 +6,10 @@ from app.services.loan.loan_assignment_status_service import (
 
 class LoanAssignmentService:
 
-    def __init__(self, db):
+    def __init__(
+            self,
+            db,
+    ):
         self.db = db
         self.status_service = LoanAssignmentStatusService()
 
@@ -14,12 +17,15 @@ class LoanAssignmentService:
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
-        self.status_service.mark_handed_out(
+
+        self.status_service.hand_out(
             assignment,
         )
 
         self.db.commit()
-        self.db.refresh(assignment)
+        self.db.refresh(
+            assignment,
+        )
 
         return assignment
 
@@ -27,11 +33,14 @@ class LoanAssignmentService:
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
-        self.status_service.mark_returned(
+
+        self.status_service.return_card(
             assignment,
         )
 
         self.db.commit()
-        self.db.refresh(assignment)
+        self.db.refresh(
+            assignment,
+        )
 
         return assignment

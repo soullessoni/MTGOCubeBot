@@ -16,7 +16,7 @@ class LoanAssignmentStatusService:
         RETURNED: [],
     }
 
-    def mark_handed_out(
+    def hand_out(
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
@@ -26,7 +26,7 @@ class LoanAssignmentStatusService:
             self.HANDED_OUT,
         )
 
-    def mark_returned(
+    def return_card(
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
@@ -34,25 +34,6 @@ class LoanAssignmentStatusService:
         return self._transition(
             assignment,
             self.RETURNED,
-        )
-
-    # Alias métier pour les nouveaux appels
-    def hand_out(
-            self,
-            assignment: LoanAssignment,
-    ) -> LoanAssignment:
-
-        return self.mark_handed_out(
-            assignment,
-        )
-
-    def return_card(
-            self,
-            assignment: LoanAssignment,
-    ) -> LoanAssignment:
-
-        return self.mark_returned(
-            assignment,
         )
 
     def _transition(
