@@ -1,11 +1,9 @@
 from fastapi import FastAPI
 
 from app.api.loan import (
-    session_actions,
-    assignments,
+    sessions_router,
+    assignments_router,
 )
-from app.api.loan.sessions import router as loan_sessions_router
-
 
 app = FastAPI(
     title="MTGO CubeBot API",
@@ -15,17 +13,12 @@ app = FastAPI(
 
 
 app.include_router(
-    loan_sessions_router,
+    sessions_router,
 )
 
 app.include_router(
-    session_actions.router,
+    assignments_router,
 )
-
-app.include_router(
-    assignments.router,
-)
-
 
 @app.get("/")
 def health_check() -> dict[str, str]:
