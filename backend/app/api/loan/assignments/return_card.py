@@ -6,7 +6,9 @@ from app.models.loan_assignment import LoanAssignment
 from app.services.loan.loan_session_workflow_service import (
     LoanSessionWorkflowService,
 )
-
+from app.use_cases.loan.return_loan_card import (
+    ReturnLoanCardUseCase,
+)
 
 router = APIRouter(
     prefix="/loan/sessions",
@@ -39,8 +41,12 @@ def return_loan_assignment(
         db,
     )
 
+    use_case = ReturnLoanCardUseCase(
+        workflow_service,
+    )
+
     try:
-        result = workflow_service.return_card(
+        result = use_case.execute(
             assignment,
         )
 

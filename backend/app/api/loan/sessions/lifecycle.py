@@ -10,13 +10,20 @@ from app.services.loan.loan_session_status_service import (
 from app.services.loan.loan_session_workflow_service import (
     LoanSessionWorkflowService,
 )
+from app.use_cases.loan.complete_loan_session import (
+    CompleteLoanSessionUseCase,
+)
+from app.use_cases.loan.hand_out_loan_session import (
+    HandOutLoanSessionUseCase,
+)
+from app.use_cases.loan.mark_ready_loan_session import (
+    MarkReadyLoanSessionUseCase,
+)
 from app.use_cases.loan.start_loan_session import (
     StartLoanSessionUseCase,
 )
 
-
 router = APIRouter(
-    prefix="/loan/sessions",
     tags=["loan"],
 )
 
@@ -46,10 +53,12 @@ def mark_ready_loan_session(
             detail="Loan session not found",
         )
 
-    service = LoanSessionStatusService()
+    use_case = MarkReadyLoanSessionUseCase(
+        LoanSessionStatusService(),
+    )
 
     try:
-        service.mark_ready(
+        use_case.execute(
             session,
         )
 
@@ -91,8 +100,12 @@ def start_loan_session(
         db,
     )
 
+    use_case = StartLoanSessionUseCase(
+        workflow,
+    )
+
     try:
-        return workflow.start(
+        return use_case.execute(
             session,
         )
 
@@ -132,8 +145,12 @@ def hand_out_loan_session(
         db,
     )
 
+    use_case = HandOutLoanSessionUseCase(
+        workflow,
+    )
+
     try:
-        return workflow.hand_out(
+        return use_case.execute(
             session,
         )
 
@@ -173,8 +190,12 @@ def complete_loan_session(
         db,
     )
 
+    use_case = CompleteLoanSessionUseCase(
+        workflow,
+    )
+
     try:
-        return workflow.complete(
+        return use_case.execute(
             session,
         )
 

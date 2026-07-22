@@ -7,13 +7,8 @@ from app.schemas.loan.loan_session import LoanSessionResponse
 from app.services.loan.loan_session_status_service import (
     LoanSessionStatusService,
 )
-from app.use_cases.loan.start_loan_session import (
-    StartLoanSessionUseCase,
-)
-
 
 router = APIRouter(
-    prefix="/loan/sessions",
     tags=["loan"],
 )
 

@@ -13,15 +13,13 @@ from app.use_cases.loan.create_loan_session import (
     CreateLoanSessionUseCase,
 )
 
-
 router = APIRouter(
-    prefix="/loan/sessions",
     tags=["loan"],
 )
 
 
 @router.post(
-    "",
+    "/",
     response_model=LoanSessionResponse,
 )
 def create_loan_session(

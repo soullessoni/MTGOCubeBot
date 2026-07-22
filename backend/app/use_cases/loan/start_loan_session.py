@@ -16,7 +16,6 @@ class StartLoanSessionUseCase:
             self,
             session: LoanSession,
     ) -> LoanSession:
-
         self.status_service.start(
             session,
         )

@@ -17,7 +17,6 @@ class LoanAssignmentService:
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
-
         self.status_service.hand_out(
             assignment,
         )
@@ -33,7 +32,6 @@ class LoanAssignmentService:
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
-
         self.status_service.return_card(
             assignment,
         )

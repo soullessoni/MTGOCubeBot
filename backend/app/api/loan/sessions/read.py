@@ -5,9 +5,7 @@ from app.db.session import get_db
 from app.models.loan_session import LoanSession
 from app.schemas.loan.loan_session import LoanSessionResponse
 
-
 router = APIRouter(
-    prefix="/loan/sessions",
     tags=["loan"],
 )
 

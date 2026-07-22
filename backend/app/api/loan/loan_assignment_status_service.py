@@ -20,7 +20,6 @@ class LoanAssignmentStatusService:
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
-
         return self._transition(
             assignment,
             self.HANDED_OUT,
@@ -30,7 +29,6 @@ class LoanAssignmentStatusService:
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
-
         return self._transition(
             assignment,
             self.RETURNED,
@@ -41,7 +39,6 @@ class LoanAssignmentStatusService:
             assignment: LoanAssignment,
             new_status: str,
     ) -> LoanAssignment:
-
         current_status = assignment.status
 
         allowed = self.ALLOWED_TRANSITIONS.get(
