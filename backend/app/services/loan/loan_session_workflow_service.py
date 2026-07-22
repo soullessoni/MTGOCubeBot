@@ -70,7 +70,9 @@ class LoanSessionWorkflowService:
                 "Only HANDED_OUT assignments can be returned"
             )
 
-        assignment.status = "RETURNED"
+        self.assignment_service.mark_returned(
+            assignment,
+        )
 
         self.db.commit()
         self.db.refresh(assignment)

@@ -221,24 +221,20 @@ def start_loan_session(
             detail="Loan session not found",
         )
 
-    status_service = LoanSessionStatusService()
+    workflow_service = LoanSessionWorkflowService(
+        db,
+    )
 
     try:
-        status_service.start(
+        return workflow_service.start(
             session,
         )
-
-        db.commit()
-        db.refresh(session)
 
     except ValueError as error:
         raise HTTPException(
             status_code=400,
             detail=str(error),
         )
-
-    return session
-
 
 @router.post(
     "/{session_id}/complete",
