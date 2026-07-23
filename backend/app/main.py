@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.exceptions.loan import CardNotFoundError
 
+from app.api.inventory import inventory_router
 from app.api.loan import (
     sessions_router,
     assignments_router,
@@ -22,6 +23,10 @@ app.include_router(
 
 app.include_router(
     assignments_router,
+)
+
+app.include_router(
+    inventory_router,
 )
 
 app.mount(

@@ -10,6 +10,9 @@ class FakeInventoryService:
     def check_availability(self, card):
         return True
 
+    def get_available_quantity(self, card):
+        return 99
+
 
 
 def test_generate_loan_requests():

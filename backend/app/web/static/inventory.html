@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <title>MTGO CubeBot — Inventaire</title>
+    <link rel="stylesheet" href="dashboard.css"/>
+</head>
+<body>
+<header>
+    <a href="index.html">&larr; Sessions</a>
+    <h1>Inventaire</h1>
+    <button id="refresh-btn">Rafraîchir</button>
+</header>
+<main>
+    <p id="error-message" class="error" hidden></p>
+    <table>
+        <thead>
+        <tr>
+            <th>Carte</th>
+            <th>Possédé</th>
+            <th>Disponible</th>
+            <th>Modifier</th>
+        </tr>
+        </thead>
+        <tbody id="inventory-body"></tbody>
+    </table>
+    <p id="empty-message" hidden>Aucun article d'inventaire pour le moment.</p>
+</main>
+<script src="dashboard.js"></script>
+<script>
+    document.getElementById("refresh-btn").addEventListener("click", renderInventory);
+    renderInventory();
+</script>
+</body>
+</html>

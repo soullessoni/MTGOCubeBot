@@ -1,7 +1,9 @@
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.models.card import Card
 from app.models.inventory_item import InventoryItem
+from app.models.loan_assignment import LoanAssignment
 
 
 class InventoryService:
@@ -54,3 +56,39 @@ class InventoryService:
             item.quantity = quantity
 
         self.db.commit()
+
+    def list_all(self) -> list[InventoryItem]:
+        return self.db.query(InventoryItem).all()
+
+    def get_reserved_quantity(
+            self,
+            card: Card,
+    ) -> int:
+
+        reserved = (
+            self.db.query(
+                func.coalesce(
+                    func.sum(LoanAssignment.quantity),
+                    0,
+                )
+            )
+            .filter(
+                LoanAssignment.card_id == card.id,
+                LoanAssignment.status != "RETURNED",
+            )
+            .scalar()
+        )
+
+        return reserved
+
+    def get_available_quantity(
+            self,
+            card: Card,
+    ) -> int:
+
+        available = (
+                self.get_quantity(card)
+                - self.get_reserved_quantity(card)
+        )
+
+        return max(available, 0)

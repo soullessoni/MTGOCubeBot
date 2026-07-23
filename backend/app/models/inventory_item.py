@@ -33,3 +33,7 @@ class InventoryItem(Base):
         "Card",
         back_populates="inventory",
     )
+
+    @property
+    def card_name(self) -> str | None:
+        return self.card.name if self.card else None

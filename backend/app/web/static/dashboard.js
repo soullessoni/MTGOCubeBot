@@ -1,4 +1,5 @@
 const API_BASE = "/loan/sessions";
+const INVENTORY_API_BASE = "/inventory";
 
 const SESSION_ACTIONS = {
     CREATED: {label: "Marquer prête", endpoint: "ready"},
@@ -33,6 +34,21 @@ async function apiGet(path) {
 
 async function apiPost(path) {
     const response = await fetch(path, {method: "POST"});
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.detail || `Erreur ${response.status}`);
+    }
+
+    return data;
+}
+
+async function apiPut(path, body) {
+    const response = await fetch(path, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body),
+    });
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
@@ -197,6 +213,65 @@ function renderAssignments(session) {
             try {
                 await apiPost(`${API_BASE}/assignments/${assignmentId}/${endpoint}`);
                 await renderSessionDetail();
+            } catch (err) {
+                showError(err.message);
+            }
+        });
+    });
+}
+
+async function renderInventory() {
+    const tbody = document.getElementById("inventory-body");
+    const emptyMessage = document.getElementById("empty-message");
+
+    clearError();
+
+    let items;
+
+    try {
+        items = await apiGet(`${INVENTORY_API_BASE}/`);
+    } catch (err) {
+        showError("Impossible de charger l'inventaire.");
+        return;
+    }
+
+    tbody.innerHTML = "";
+
+    if (items.length === 0) {
+        emptyMessage.hidden = false;
+        return;
+    }
+
+    emptyMessage.hidden = true;
+
+    for (const item of items) {
+        const row = document.createElement("tr");
+        const cardLabel = item.card_name || `Carte #${item.card_id}`;
+
+        row.innerHTML = `
+            <td>${cardLabel}</td>
+            <td>${item.quantity}</td>
+            <td>${item.available_quantity}</td>
+            <td>
+                <input type="number" min="0" value="${item.quantity}" data-card-id="${item.card_id}" class="quantity-input"/>
+                <button data-card-id="${item.card_id}" class="save-quantity-btn">Enregistrer</button>
+            </td>
+        `;
+
+        tbody.appendChild(row);
+    }
+
+    tbody.querySelectorAll(".save-quantity-btn").forEach((button) => {
+        button.addEventListener("click", async () => {
+            clearError();
+
+            const cardId = button.dataset.cardId;
+            const input = tbody.querySelector(`.quantity-input[data-card-id="${cardId}"]`);
+            const quantity = parseInt(input.value, 10);
+
+            try {
+                await apiPut(`${INVENTORY_API_BASE}/${cardId}`, {quantity});
+                await renderInventory();
             } catch (err) {
                 showError(err.message);
             }

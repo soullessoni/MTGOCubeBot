@@ -115,31 +115,21 @@ class LoanPlanningService:
 
         for card_name, players in card_usage.items():
 
-            if len(players) > 1:
+            card = cards_by_name[card_name]
 
-                card = cards_by_name[card_name]
+            available = self.inventory_service.get_available_quantity(
+                card,
+            )
 
-                if hasattr(
-                        self.inventory_service,
-                        "get_quantity",
-                ):
-                    available = self.inventory_service.get_quantity(card)
+            required = len(players)
 
-                else:
-                    available = (
-                        self.inventory_service.get_available_quantity(card)
-                        if hasattr(
-                            self.inventory_service,
-                            "get_available_quantity",
-                        )
-                        else 0
-                    )
-                    
+            if required > available:
+
                 conflicts.append(
                     LoanConflict(
                         card=card,
                         players=players,
-                        required=len(players),
+                        required=required,
                         available=available,
                     )
                 )
