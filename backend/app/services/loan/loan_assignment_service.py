@@ -13,11 +13,41 @@ class LoanAssignmentService:
         self.db = db
         self.status_service = LoanAssignmentStatusService()
 
-    def mark_handed_out(
+    def mark_prepared(
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
-        self.status_service.hand_out(
+        self.status_service.mark_prepared(
+            assignment,
+        )
+
+        self.db.commit()
+        self.db.refresh(
+            assignment,
+        )
+
+        return assignment
+
+    def mark_distributed(
+            self,
+            assignment: LoanAssignment,
+    ) -> LoanAssignment:
+        self.status_service.mark_distributed(
+            assignment,
+        )
+
+        self.db.commit()
+        self.db.refresh(
+            assignment,
+        )
+
+        return assignment
+
+    def mark_confirmed(
+            self,
+            assignment: LoanAssignment,
+    ) -> LoanAssignment:
+        self.status_service.mark_confirmed(
             assignment,
         )
 
@@ -32,7 +62,7 @@ class LoanAssignmentService:
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
-        self.status_service.return_card(
+        self.status_service.mark_returned(
             assignment,
         )
 

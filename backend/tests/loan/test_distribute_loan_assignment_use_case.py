@@ -4,12 +4,12 @@ from app.models.loan_session import LoanSession
 from app.services.loan.loan_session_workflow_service import (
     LoanSessionWorkflowService,
 )
-from app.use_cases.loan.return_loan_card import (
-    ReturnLoanCardUseCase,
+from app.use_cases.loan.distribute_loan_assignment import (
+    DistributeLoanAssignmentUseCase,
 )
 
 
-def test_return_loan_card(db_session):
+def test_distribute_loan_assignment(db_session):
     card = Card(
         name="Black Lotus",
     )
@@ -18,7 +18,7 @@ def test_return_loan_card(db_session):
         card=card,
         player_name="Alice",
         quantity=1,
-        status="CONFIRMED",
+        status="PREPARED",
     )
 
     session = LoanSession(
@@ -38,7 +38,7 @@ def test_return_loan_card(db_session):
         db_session,
     )
 
-    use_case = ReturnLoanCardUseCase(
+    use_case = DistributeLoanAssignmentUseCase(
         workflow,
     )
 
@@ -46,4 +46,4 @@ def test_return_loan_card(db_session):
         assignment,
     )
 
-    assert result.status == "RETURNED"
+    assert result.status == "DISTRIBUTED"

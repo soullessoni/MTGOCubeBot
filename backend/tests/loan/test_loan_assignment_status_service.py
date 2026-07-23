@@ -6,21 +6,45 @@ from app.services.loan.loan_assignment_status_service import (
 )
 
 
-def test_mark_handed_out():
+def test_mark_prepared():
     assignment = LoanAssignment(
         status="CREATED",
     )
 
     service = LoanAssignmentStatusService()
 
-    service.mark_handed_out(assignment)
+    service.mark_prepared(assignment)
 
-    assert assignment.status == "HANDED_OUT"
+    assert assignment.status == "PREPARED"
+
+
+def test_mark_distributed():
+    assignment = LoanAssignment(
+        status="PREPARED",
+    )
+
+    service = LoanAssignmentStatusService()
+
+    service.mark_distributed(assignment)
+
+    assert assignment.status == "DISTRIBUTED"
+
+
+def test_mark_confirmed():
+    assignment = LoanAssignment(
+        status="DISTRIBUTED",
+    )
+
+    service = LoanAssignmentStatusService()
+
+    service.mark_confirmed(assignment)
+
+    assert assignment.status == "CONFIRMED"
 
 
 def test_mark_returned():
     assignment = LoanAssignment(
-        status="HANDED_OUT",
+        status="CONFIRMED",
     )
 
     service = LoanAssignmentStatusService()
@@ -30,7 +54,7 @@ def test_mark_returned():
     assert assignment.status == "RETURNED"
 
 
-def test_invalid_transition():
+def test_created_cannot_be_returned():
     assignment = LoanAssignment(
         status="CREATED",
     )
@@ -39,3 +63,36 @@ def test_invalid_transition():
 
     with pytest.raises(ValueError):
         service.mark_returned(assignment)
+
+
+def test_cannot_skip_from_created_to_distributed():
+    assignment = LoanAssignment(
+        status="CREATED",
+    )
+
+    service = LoanAssignmentStatusService()
+
+    with pytest.raises(ValueError):
+        service.mark_distributed(assignment)
+
+
+def test_cannot_skip_from_prepared_to_confirmed():
+    assignment = LoanAssignment(
+        status="PREPARED",
+    )
+
+    service = LoanAssignmentStatusService()
+
+    with pytest.raises(ValueError):
+        service.mark_confirmed(assignment)
+
+
+def test_returned_is_terminal():
+    assignment = LoanAssignment(
+        status="RETURNED",
+    )
+
+    service = LoanAssignmentStatusService()
+
+    with pytest.raises(ValueError):
+        service.mark_prepared(assignment)

@@ -34,40 +34,56 @@ class LoanSessionWorkflowService:
 
         return result
 
-    def hand_out(
+    def prepare_assignment(
             self,
-            session: LoanSession,
-    ) -> LoanSession:
+            assignment: LoanAssignment,
+    ) -> LoanAssignment:
 
-        if session.status != "IN_PROGRESS":
+        if assignment.session.status != "IN_PROGRESS":
             raise ValueError(
                 "Session must be IN_PROGRESS"
             )
 
-        for assignment in session.assignments:
+        return self.assignment_service.mark_prepared(
+            assignment,
+        )
 
-            if assignment.status != "CREATED":
-                raise ValueError(
-                    "All assignments must be CREATED"
-                )
+    def distribute_assignment(
+            self,
+            assignment: LoanAssignment,
+    ) -> LoanAssignment:
 
-        for assignment in session.assignments:
-            self.assignment_service.mark_handed_out(
-                assignment
+        if assignment.session.status != "IN_PROGRESS":
+            raise ValueError(
+                "Session must be IN_PROGRESS"
             )
-        self.db.commit()
-        self.db.refresh(session)
 
-        return session
+        return self.assignment_service.mark_distributed(
+            assignment,
+        )
+
+    def confirm_assignment(
+            self,
+            assignment: LoanAssignment,
+    ) -> LoanAssignment:
+
+        if assignment.session.status != "IN_PROGRESS":
+            raise ValueError(
+                "Session must be IN_PROGRESS"
+            )
+
+        return self.assignment_service.mark_confirmed(
+            assignment,
+        )
 
     def return_card(
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
 
-        if assignment.status != "HANDED_OUT":
+        if assignment.status != "CONFIRMED":
             raise ValueError(
-                "Only HANDED_OUT assignments can be returned"
+                "Only CONFIRMED assignments can be returned"
             )
 
         self.assignment_service.mark_returned(

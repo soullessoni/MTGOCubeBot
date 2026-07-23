@@ -54,7 +54,7 @@ def test_cannot_complete_with_unreturned_cards(
     session.assignments.append(
         LoanAssignment(
             card=card,
-            status="HANDED_OUT",
+            status="CONFIRMED",
             player_name="Alice",
             quantity=1,
         )

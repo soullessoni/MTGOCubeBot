@@ -3,7 +3,7 @@ from app.models.loan_assignment import LoanAssignment
 from app.models.loan_session import LoanSession
 
 
-def test_return_loan_assignment_api(
+def test_distribute_loan_assignment_api(
         client,
         db_session,
 ):
@@ -17,7 +17,7 @@ def test_return_loan_assignment_api(
 
     assignment = LoanAssignment(
         card=card,
-        status="CONFIRMED",
+        status="PREPARED",
         player_name="Alice",
         quantity=1,
     )
@@ -31,17 +31,17 @@ def test_return_loan_assignment_api(
     db_session.refresh(assignment)
 
     response = client.post(
-        f"/loan/sessions/assignments/{assignment.id}/return"
+        f"/loan/sessions/assignments/{assignment.id}/distribute"
     )
 
     assert response.status_code == 200
 
     data = response.json()
 
-    assert data["status"] == "RETURNED"
+    assert data["status"] == "DISTRIBUTED"
 
 
-def test_cannot_return_created_assignment(
+def test_cannot_distribute_created_assignment(
         client,
         db_session,
 ):
@@ -69,7 +69,7 @@ def test_cannot_return_created_assignment(
     db_session.refresh(assignment)
 
     response = client.post(
-        f"/loan/sessions/assignments/{assignment.id}/return"
+        f"/loan/sessions/assignments/{assignment.id}/distribute"
     )
 
     assert response.status_code == 400

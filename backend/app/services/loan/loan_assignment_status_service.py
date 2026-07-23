@@ -3,26 +3,52 @@ from app.models.loan_assignment import LoanAssignment
 
 class LoanAssignmentStatusService:
     CREATED = "CREATED"
-    HANDED_OUT = "HANDED_OUT"
+    PREPARED = "PREPARED"
+    DISTRIBUTED = "DISTRIBUTED"
+    CONFIRMED = "CONFIRMED"
     RETURNED = "RETURNED"
 
     ALLOWED_TRANSITIONS = {
         CREATED: [
-            HANDED_OUT,
+            PREPARED,
         ],
-        HANDED_OUT: [
+        PREPARED: [
+            DISTRIBUTED,
+        ],
+        DISTRIBUTED: [
+            CONFIRMED,
+        ],
+        CONFIRMED: [
             RETURNED,
         ],
         RETURNED: [],
     }
 
-    def mark_handed_out(
+    def mark_prepared(
             self,
             assignment: LoanAssignment,
     ) -> LoanAssignment:
         return self._transition(
             assignment,
-            self.HANDED_OUT,
+            self.PREPARED,
+        )
+
+    def mark_distributed(
+            self,
+            assignment: LoanAssignment,
+    ) -> LoanAssignment:
+        return self._transition(
+            assignment,
+            self.DISTRIBUTED,
+        )
+
+    def mark_confirmed(
+            self,
+            assignment: LoanAssignment,
+    ) -> LoanAssignment:
+        return self._transition(
+            assignment,
+            self.CONFIRMED,
         )
 
     def mark_returned(
@@ -32,23 +58,6 @@ class LoanAssignmentStatusService:
         return self._transition(
             assignment,
             self.RETURNED,
-        )
-
-    # Alias métier pour les nouveaux appels
-    def hand_out(
-            self,
-            assignment: LoanAssignment,
-    ) -> LoanAssignment:
-        return self.mark_handed_out(
-            assignment,
-        )
-
-    def return_card(
-            self,
-            assignment: LoanAssignment,
-    ) -> LoanAssignment:
-        return self.mark_returned(
-            assignment,
         )
 
     def _transition(

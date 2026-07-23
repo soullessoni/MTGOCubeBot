@@ -53,7 +53,7 @@ def test_session_with_invalid_assignment_state():
 
     session.assignments.append(
         LoanAssignment(
-            status="HANDED_OUT",
+            status="CONFIRMED",
         )
     )
 
@@ -64,26 +64,28 @@ def test_session_with_invalid_assignment_state():
     assert result.valid is False
     assert len(result.errors) == 1
 
-    def test_validation_result_valid_is_derived():
-        from app.services.loan.loan_session_validation_service import (
-            LoanSessionValidationResult,
-        )
 
-        result = LoanSessionValidationResult(
-            errors=[],
-        )
+def test_validation_result_valid_is_derived():
+    from app.services.loan.loan_session_validation_service import (
+        LoanSessionValidationResult,
+    )
 
-        assert result.valid is True
+    result = LoanSessionValidationResult(
+        errors=[],
+    )
 
-    def test_validation_result_invalid_is_derived():
-        from app.services.loan.loan_session_validation_service import (
-            LoanSessionValidationResult,
-        )
+    assert result.valid is True
 
-        result = LoanSessionValidationResult(
-            errors=[
-                "error",
-            ],
-        )
 
-        assert result.valid is False
+def test_validation_result_invalid_is_derived():
+    from app.services.loan.loan_session_validation_service import (
+        LoanSessionValidationResult,
+    )
+
+    result = LoanSessionValidationResult(
+        errors=[
+            "error",
+        ],
+    )
+
+    assert result.valid is False

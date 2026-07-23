@@ -52,25 +52,40 @@ def test_full_loan_session_lifecycle_api(
     assert response.json()["status"] == "IN_PROGRESS"
 
     #
-    # HAND OUT
+    # PREPARE
     #
     response = client.post(
-        f"/loan/sessions/{session.id}/hand-out"
+        f"/loan/sessions/assignments/{assignment.id}/prepare"
     )
 
     assert response.status_code == 200
+    assert response.json()["status"] == "PREPARED"
 
-    data = response.json()
+    #
+    # DISTRIBUTE
+    #
+    response = client.post(
+        f"/loan/sessions/assignments/{assignment.id}/distribute"
+    )
 
-    assert data["assignments"][0]["status"] == "HANDED_OUT"
+    assert response.status_code == 200
+    assert response.json()["status"] == "DISTRIBUTED"
+
+    #
+    # CONFIRM
+    #
+    response = client.post(
+        f"/loan/sessions/assignments/{assignment.id}/confirm"
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "CONFIRMED"
 
     #
     # RETURN CARD
     #
-    assignment_id = data["assignments"][0]["id"]
-
     response = client.post(
-        f"/loan/sessions/assignments/{assignment_id}/return"
+        f"/loan/sessions/assignments/{assignment.id}/return"
     )
 
     assert response.status_code == 200

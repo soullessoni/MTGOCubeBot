@@ -4,12 +4,12 @@ from app.models.loan_session import LoanSession
 from app.services.loan.loan_session_workflow_service import (
     LoanSessionWorkflowService,
 )
-from app.use_cases.loan.hand_out_loan_session import (
-    HandOutLoanSessionUseCase,
+from app.use_cases.loan.prepare_loan_assignment import (
+    PrepareLoanAssignmentUseCase,
 )
 
 
-def test_hand_out_loan_session(db_session):
+def test_prepare_loan_assignment(db_session):
     card = Card(
         name="Black Lotus",
     )
@@ -38,12 +38,12 @@ def test_hand_out_loan_session(db_session):
         db_session,
     )
 
-    use_case = HandOutLoanSessionUseCase(
+    use_case = PrepareLoanAssignmentUseCase(
         workflow,
     )
 
     result = use_case.execute(
-        session,
+        assignment,
     )
 
-    assert result.assignments[0].status == "HANDED_OUT"
+    assert result.status == "PREPARED"

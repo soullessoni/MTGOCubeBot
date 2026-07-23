@@ -1,52 +1,110 @@
-import pytest
-
+from app.models.card import Card
 from app.models.loan_assignment import LoanAssignment
-from app.services.loan.loan_assignment_status_service import (
-    LoanAssignmentStatusService,
+from app.models.loan_session import LoanSession
+from app.services.loan.loan_assignment_service import (
+    LoanAssignmentService,
 )
 
 
-def test_created_can_be_handed_out():
+def test_mark_prepared_persists(db_session):
+    session = LoanSession(
+        status="IN_PROGRESS",
+    )
+
     assignment = LoanAssignment(
+        card=Card(name="Black Lotus"),
+        player_name="Alice",
+        quantity=1,
         status="CREATED",
     )
 
-    service = LoanAssignmentStatusService()
-
-    service.mark_handed_out(assignment)
-
-    assert assignment.status == "HANDED_OUT"
-
-
-def test_created_cannot_be_returned():
-    assignment = LoanAssignment(
-        status="CREATED",
+    session.assignments.append(
+        assignment,
     )
 
-    service = LoanAssignmentStatusService()
+    db_session.add(session)
+    db_session.commit()
 
-    with pytest.raises(ValueError):
-        service.mark_returned(assignment)
+    service = LoanAssignmentService(db_session)
+
+    result = service.mark_prepared(assignment)
+
+    assert result.status == "PREPARED"
 
 
-def test_handed_out_can_be_returned():
-    assignment = LoanAssignment(
-        status="HANDED_OUT",
+def test_mark_distributed_persists(db_session):
+    session = LoanSession(
+        status="IN_PROGRESS",
     )
 
-    service = LoanAssignmentStatusService()
-
-    service.mark_returned(assignment)
-
-    assert assignment.status == "RETURNED"
-
-
-def test_returned_cannot_be_handed_out():
     assignment = LoanAssignment(
-        status="RETURNED",
+        card=Card(name="Black Lotus"),
+        player_name="Alice",
+        quantity=1,
+        status="PREPARED",
     )
 
-    service = LoanAssignmentStatusService()
+    session.assignments.append(
+        assignment,
+    )
 
-    with pytest.raises(ValueError):
-        service.mark_handed_out(assignment)
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanAssignmentService(db_session)
+
+    result = service.mark_distributed(assignment)
+
+    assert result.status == "DISTRIBUTED"
+
+
+def test_mark_confirmed_persists(db_session):
+    session = LoanSession(
+        status="IN_PROGRESS",
+    )
+
+    assignment = LoanAssignment(
+        card=Card(name="Black Lotus"),
+        player_name="Alice",
+        quantity=1,
+        status="DISTRIBUTED",
+    )
+
+    session.assignments.append(
+        assignment,
+    )
+
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanAssignmentService(db_session)
+
+    result = service.mark_confirmed(assignment)
+
+    assert result.status == "CONFIRMED"
+
+
+def test_mark_returned_persists(db_session):
+    session = LoanSession(
+        status="IN_PROGRESS",
+    )
+
+    assignment = LoanAssignment(
+        card=Card(name="Black Lotus"),
+        player_name="Alice",
+        quantity=1,
+        status="CONFIRMED",
+    )
+
+    session.assignments.append(
+        assignment,
+    )
+
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanAssignmentService(db_session)
+
+    result = service.mark_returned(assignment)
+
+    assert result.status == "RETURNED"

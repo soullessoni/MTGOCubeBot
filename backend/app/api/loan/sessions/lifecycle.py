@@ -13,9 +13,6 @@ from app.services.loan.loan_session_workflow_service import (
 from app.use_cases.loan.complete_loan_session import (
     CompleteLoanSessionUseCase,
 )
-from app.use_cases.loan.hand_out_loan_session import (
-    HandOutLoanSessionUseCase,
-)
 from app.use_cases.loan.mark_ready_loan_session import (
     MarkReadyLoanSessionUseCase,
 )
@@ -101,51 +98,6 @@ def start_loan_session(
     )
 
     use_case = StartLoanSessionUseCase(
-        workflow,
-    )
-
-    try:
-        return use_case.execute(
-            session,
-        )
-
-    except ValueError as error:
-        raise HTTPException(
-            status_code=400,
-            detail=str(error),
-        )
-
-
-@router.post(
-    "/{session_id}/hand-out",
-    response_model=LoanSessionResponse,
-)
-def hand_out_loan_session(
-        session_id: int,
-        db: Session = Depends(get_db),
-):
-    session = (
-        db.query(LoanSession)
-        .options(
-            selectinload(LoanSession.assignments)
-        )
-        .filter(
-            LoanSession.id == session_id
-        )
-        .first()
-    )
-
-    if session is None:
-        raise HTTPException(
-            status_code=404,
-            detail="Loan session not found",
-        )
-
-    workflow = LoanSessionWorkflowService(
-        db,
-    )
-
-    use_case = HandOutLoanSessionUseCase(
         workflow,
     )
 

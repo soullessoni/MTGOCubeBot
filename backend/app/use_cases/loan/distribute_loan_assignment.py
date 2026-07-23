@@ -1,10 +1,10 @@
-from app.models.loan_session import LoanSession
+from app.models.loan_assignment import LoanAssignment
 from app.services.loan.loan_session_workflow_service import (
     LoanSessionWorkflowService,
 )
 
 
-class HandOutLoanSessionUseCase:
+class DistributeLoanAssignmentUseCase:
 
     def __init__(
             self,
@@ -14,8 +14,8 @@ class HandOutLoanSessionUseCase:
 
     def execute(
             self,
-            session: LoanSession,
-    ) -> LoanSession:
-        return self.workflow_service.hand_out(
-            session,
+            assignment: LoanAssignment,
+    ) -> LoanAssignment:
+        return self.workflow_service.distribute_assignment(
+            assignment,
         )
