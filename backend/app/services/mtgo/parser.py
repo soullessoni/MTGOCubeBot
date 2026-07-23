@@ -1,15 +1,12 @@
-from dataclasses import dataclass
-
-
-@dataclass
-class CardEntry:
-    name: str
-    quantity: int
+from app.services.mtgo.models import MTGOCardEntry
 
 
 class MTGOParser:
 
-    def parse(self, content: str) -> list[CardEntry]:
+    def parse(
+        self,
+        content: str,
+    ) -> list[MTGOCardEntry]:
 
         cards = []
 
@@ -27,10 +24,15 @@ class MTGOParser:
 
             quantity, name = parts
 
+            try:
+                quantity = int(quantity)
+            except ValueError:
+                continue
+
             cards.append(
-                CardEntry(
+                MTGOCardEntry(
                     name=name.strip(),
-                    quantity=int(quantity),
+                    quantity=quantity,
                 )
             )
 

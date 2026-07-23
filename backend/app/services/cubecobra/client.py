@@ -38,3 +38,34 @@ class CubeCobraClient:
         response.raise_for_status()
 
         return response.text
+
+    def extract_deck_id(self) -> str:
+        match = re.search(
+            r"/cube/deck/([a-f0-9-]{36})",
+            self.cube_url,
+        )
+
+        if not match:
+            raise ValueError(
+                "CubeCobra deck URL must contain a UUID"
+            )
+
+        return match.group(1)
+
+    def download_deck_mtgo_export(self) -> str:
+        deck_id = self.extract_deck_id()
+
+        export_url = (
+            "https://cubecobra.com/cube/download/mtgo/"
+            f"{deck_id}"
+            "?boards=mainboard"
+        )
+
+        response = httpx.get(
+            export_url,
+            timeout=30,
+        )
+
+        response.raise_for_status()
+
+        return response.text

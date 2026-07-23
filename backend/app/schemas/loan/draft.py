@@ -8,3 +8,7 @@ class DraftPlayerPool(BaseModel):
 
 class CreateLoanSessionFromDraftRequest(BaseModel):
     players: list[DraftPlayerPool]
+
+class CreateLoanSessionFromDraftUrlRequest(BaseModel):
+    draft_url: str
+    player_name: str

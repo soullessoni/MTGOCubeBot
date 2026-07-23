@@ -4,7 +4,6 @@ from app.models import Card, Cube, CubeCard
 from app.services.cubecobra.client import CubeCobraClient
 from app.services.mtgo.parser import MTGOParser
 
-
 class CubeImportService:
 
     def __init__(self, db: Session):
@@ -23,7 +22,7 @@ class CubeImportService:
         export = client.download_mtgo_export()
 
         parser = MTGOParser()
-
+        
         cards = parser.parse(
             export
         )

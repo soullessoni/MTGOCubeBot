@@ -3,12 +3,12 @@ from unittest.mock import patch
 from app.services.cube.cube_import_service import (
     CubeImportService,
 )
-from app.services.mtgo.parser import CardEntry
+from app.services.mtgo.parser import MTGOCardEntry
 
 
 def test_create_cube(db_session):
     parsed_cards = [
-        CardEntry(
+        MTGOCardEntry(
             name="Black Lotus",
             quantity=1,
         ),

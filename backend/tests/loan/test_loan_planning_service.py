@@ -1,57 +1,112 @@
 from app.models.card import Card
-from app.services.loan.loan_planning_service import (
-    LoanPlanningService,
-    PlayerPool,
-)
+from app.services.loan.loan_planning_service import LoanPlanningService
 
 
-class FakeInventory:
+class FakeInventoryService:
 
-    def get_quantity(self, card):
-        return 99
+    def __init__(self):
+        self.calls = []
+
+    def check_availability(self, card):
+        return True
+
 
 
 def test_generate_loan_requests():
-    lotus = Card(name="Black Lotus")
-    bolt = Card(name="Lightning Bolt")
-    ring = Card(name="Sol Ring")
 
-    pools = [
-        PlayerPool(
-            player_name="Alice",
-            cards=[
-                lotus,
-                bolt,
-            ],
-        ),
-        PlayerPool(
-            player_name="Bob",
-            cards=[
-                ring,
-            ],
-        ),
-    ]
-
-    service = LoanPlanningService(
-        FakeInventory()
+    lotus = Card(
+        name="Black Lotus",
     )
 
-    result = service.generate(pools)
+    bolt = Card(
+        name="Lightning Bolt",
+    )
 
-    assert result.valid
-    assert result.conflicts == []
+    service = LoanPlanningService(
+        inventory_service=FakeInventoryService()
+    )
 
-    requests = result.requests
+    result = service.generate(
+        {
+            "Alice": [
+                lotus,
+                bolt,
+            ]
+        }
+    )
 
-    assert len(requests) == 2
+    assert len(result) == 2
 
-    assert requests[0].player_name == "Alice"
-    assert requests[0].requested_cards == [
-        lotus,
-        bolt,
-    ]
+    assert result[0].player_name == "Alice"
+    assert result[0].card == lotus
 
-    assert requests[1].player_name == "Bob"
-    assert requests[1].requested_cards == [
-        ring,
-    ]
+    assert result[1].card == bolt
+
+
+
+def test_generate_multiple_players_requests():
+
+    lotus = Card(
+        name="Black Lotus",
+    )
+
+    bolt = Card(
+        name="Lightning Bolt",
+    )
+
+    service = LoanPlanningService(
+        inventory_service=FakeInventoryService()
+    )
+
+    result = service.generate(
+        {
+            "Alice": [
+                lotus,
+            ],
+            "Bob": [
+                bolt,
+            ],
+        }
+    )
+
+    assert len(result) == 2
+
+    assert result[0].player_name == "Alice"
+    assert result[1].player_name == "Bob"
+
+
+
+def test_generate_empty_player_list():
+
+    service = LoanPlanningService(
+        inventory_service=FakeInventoryService()
+    )
+
+    result = service.generate({})
+
+    assert result == []
+
+
+
+def test_generate_detects_duplicate_cards_conflict():
+
+    lotus = Card(
+        name="Black Lotus",
+    )
+
+    service = LoanPlanningService(
+        inventory_service=FakeInventoryService()
+    )
+
+    result = service.generate(
+        {
+            "Alice": [
+                lotus,
+            ],
+            "Bob": [
+                lotus,
+            ],
+        }
+    )
+
+    assert len(result) == 2

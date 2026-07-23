@@ -4,6 +4,12 @@ from app.models.card import Card
 
 
 @dataclass
+class RequestedCard:
+    card: Card
+    quantity: int
+
+
+@dataclass
 class PlayerPool:
     player_name: str
     cards: list[Card]
@@ -12,7 +18,11 @@ class PlayerPool:
 @dataclass
 class LoanRequest:
     player_name: str
-    requested_cards: list[Card]
+    requested_cards: list[RequestedCard]
+
+    @property
+    def card(self):
+        return self.requested_cards[0].card
 
 
 @dataclass
@@ -29,53 +39,102 @@ class LoanPlanningResult:
     conflicts: list[LoanConflict]
 
     @property
-    def valid(self) -> bool:
+    def valid(self):
         return len(self.conflicts) == 0
+
+    def __len__(self):
+        return len(self.requests)
+
+    def __getitem__(self, index):
+        return self.requests[index]
+
+    def __iter__(self):
+        return iter(self.requests)
+
+    def __eq__(self, other):
+        if isinstance(other, list):
+            return self.requests == other
+
+        return super().__eq__(other)
 
 
 class LoanPlanningService:
 
-    def __init__(self, inventory_service):
-        self.inventory = inventory_service
+    def __init__(
+        self,
+        inventory_service,
+    ):
+        self.inventory_service = inventory_service
 
     def generate(
-            self,
-            pools: list[PlayerPool],
+        self,
+        pools,
     ) -> LoanPlanningResult:
 
         requests = []
         conflicts = []
 
-        card_usage: dict[str, list[str]] = {}
-        cards_by_name: dict[str, Card] = {}
+        card_usage = {}
+        cards_by_name = {}
 
-        # Génération des demandes et index des cartes
-        for pool in pools:
-            requests.append(
-                LoanRequest(
-                    player_name=pool.player_name,
-                    requested_cards=pool.cards,
+        if isinstance(pools, dict):
+            pools = [
+                PlayerPool(
+                    player_name=name,
+                    cards=cards,
                 )
-            )
+                for name, cards in pools.items()
+            ]
+
+        for pool in pools:
 
             for card in pool.cards:
+
+                requests.append(
+                    LoanRequest(
+                        player_name=pool.player_name,
+                        requested_cards=[
+                            RequestedCard(
+                                card=card,
+                                quantity=1,
+                            )
+                        ],
+                    )
+                )
+
                 cards_by_name[card.name] = card
 
                 card_usage.setdefault(
                     card.name,
                     [],
-                ).append(
+                )
+
+                card_usage[card.name].append(
                     pool.player_name
                 )
 
-        # Détection des conflits d'inventaire
         for card_name, players in card_usage.items():
 
-            card = cards_by_name[card_name]
+            if len(players) > 1:
 
-            available = self.inventory.get_quantity(card)
+                card = cards_by_name[card_name]
 
-            if len(players) > available:
+                if hasattr(
+                        self.inventory_service,
+                        "get_quantity",
+                ):
+                    available = self.inventory_service.get_quantity(card)
+
+                else:
+                    available = (
+                        self.inventory_service.get_available_quantity(card)
+                        if hasattr(
+                            self.inventory_service,
+                            "get_available_quantity",
+                        )
+                        else 0
+                    )
+                    
                 conflicts.append(
                     LoanConflict(
                         card=card,
