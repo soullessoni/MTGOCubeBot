@@ -1,7 +1,10 @@
+from pathlib import Path
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "sqlite:///./cubebot.db"
+BACKEND_DIR = Path(__file__).resolve().parent.parent.parent
+DATABASE_URL = f"sqlite:///{(BACKEND_DIR / 'cubebot.db').as_posix()}"
 
 engine = create_engine(
     DATABASE_URL,

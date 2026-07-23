@@ -1,5 +1,8 @@
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from app.exceptions.loan import CardNotFoundError
 
 from app.api.loan import (
@@ -19,6 +22,15 @@ app.include_router(
 
 app.include_router(
     assignments_router,
+)
+
+app.mount(
+    "/dashboard",
+    StaticFiles(
+        directory=Path(__file__).parent / "web" / "static",
+        html=True,
+    ),
+    name="dashboard",
 )
 
 

@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <title>MTGO CubeBot — Sessions de prêt</title>
+    <link rel="stylesheet" href="dashboard.css"/>
+</head>
+<body>
+<header>
+    <h1>Sessions de prêt</h1>
+    <button id="refresh-btn">Rafraîchir</button>
+</header>
+<main>
+    <p id="error-message" class="error" hidden></p>
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Statut</th>
+            <th>Cartes</th>
+            <th>Créée le</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody id="sessions-body"></tbody>
+    </table>
+    <p id="empty-message" hidden>Aucune session de prêt pour le moment.</p>
+</main>
+<script src="dashboard.js"></script>
+<script>
+    document.getElementById("refresh-btn").addEventListener("click", renderSessionList);
+    renderSessionList();
+</script>
+</body>
+</html>

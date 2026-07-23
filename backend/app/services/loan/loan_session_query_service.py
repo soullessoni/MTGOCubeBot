@@ -17,3 +17,12 @@ class LoanSessionQueryService:
             )
             .first()
         )
+
+    def list_all(self) -> list[LoanSession]:
+        return (
+            self.db.query(LoanSession)
+            .order_by(
+                LoanSession.created_at.desc()
+            )
+            .all()
+        )

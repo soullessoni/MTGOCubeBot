@@ -55,3 +55,41 @@ def test_get_unknown_session_returns_none(db_session):
     )
 
     assert result is None
+
+
+def test_list_all_sessions(db_session):
+    first_session = LoanSession(
+        status="CREATED",
+    )
+
+    second_session = LoanSession(
+        status="READY",
+    )
+
+    db_session.add(first_session)
+    db_session.add(second_session)
+    db_session.commit()
+
+    service = LoanSessionQueryService(
+        db_session,
+    )
+
+    result = service.list_all()
+
+    assert len(result) == 2
+    assert {
+        session.id for session in result
+    } == {
+        first_session.id,
+        second_session.id,
+    }
+
+
+def test_list_all_sessions_when_empty(db_session):
+    service = LoanSessionQueryService(
+        db_session,
+    )
+
+    result = service.list_all()
+
+    assert result == []

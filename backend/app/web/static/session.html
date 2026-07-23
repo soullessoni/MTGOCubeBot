@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <title>MTGO CubeBot — Détail session</title>
+    <link rel="stylesheet" href="dashboard.css"/>
+</head>
+<body>
+<header>
+    <a href="index.html">&larr; Sessions</a>
+    <h1 id="session-title">Session</h1>
+    <span id="session-status" class="badge"></span>
+</header>
+<main>
+    <p id="error-message" class="error" hidden></p>
+    <div id="session-actions"></div>
+    <table>
+        <thead>
+        <tr>
+            <th>Joueur</th>
+            <th>Carte</th>
+            <th>Qté</th>
+            <th>Statut</th>
+            <th>Action</th>
+        </tr>
+        </thead>
+        <tbody id="assignments-body"></tbody>
+    </table>
+</main>
+<script src="dashboard.js"></script>
+<script>
+    renderSessionDetail();
+</script>
+</body>
+</html>

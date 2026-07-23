@@ -4,10 +4,27 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.loan_session import LoanSession
 from app.schemas.loan.loan_session import LoanSessionResponse
+from app.services.loan.loan_session_query_service import (
+    LoanSessionQueryService,
+)
 
 router = APIRouter(
     tags=["loan"],
 )
+
+
+@router.get(
+    "/",
+    response_model=list[LoanSessionResponse],
+)
+def list_loan_sessions(
+        db: Session = Depends(get_db),
+):
+    service = LoanSessionQueryService(
+        db,
+    )
+
+    return service.list_all()
 
 
 @router.get(

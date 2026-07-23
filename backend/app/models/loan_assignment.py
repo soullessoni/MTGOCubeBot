@@ -59,3 +59,7 @@ class LoanAssignment(Base):
         "LoanSession",
         back_populates="assignments",
     )
+
+    @property
+    def card_name(self) -> str | None:
+        return self.card.name if self.card else None
