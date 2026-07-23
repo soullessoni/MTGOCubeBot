@@ -96,3 +96,51 @@ def test_returned_is_terminal():
 
     with pytest.raises(ValueError):
         service.mark_prepared(assignment)
+
+
+def test_force_cancel_from_created():
+    assignment = LoanAssignment(
+        status="CREATED",
+    )
+
+    service = LoanAssignmentStatusService()
+
+    service.force_cancel(assignment)
+
+    assert assignment.status == "CANCELLED"
+
+
+def test_force_cancel_from_distributed():
+    assignment = LoanAssignment(
+        status="DISTRIBUTED",
+    )
+
+    service = LoanAssignmentStatusService()
+
+    service.force_cancel(assignment)
+
+    assert assignment.status == "CANCELLED"
+
+
+def test_force_cancel_is_noop_when_already_returned():
+    assignment = LoanAssignment(
+        status="RETURNED",
+    )
+
+    service = LoanAssignmentStatusService()
+
+    service.force_cancel(assignment)
+
+    assert assignment.status == "RETURNED"
+
+
+def test_force_cancel_is_noop_when_already_cancelled():
+    assignment = LoanAssignment(
+        status="CANCELLED",
+    )
+
+    service = LoanAssignmentStatusService()
+
+    service.force_cancel(assignment)
+
+    assert assignment.status == "CANCELLED"

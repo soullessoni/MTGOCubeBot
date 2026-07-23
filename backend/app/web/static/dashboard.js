@@ -7,6 +7,8 @@ const SESSION_ACTIONS = {
     IN_PROGRESS: {label: "Compléter", endpoint: "complete"},
 };
 
+const CANCELLABLE_STATUSES = ["CREATED", "READY", "IN_PROGRESS"];
+
 const ASSIGNMENT_ACTIONS = {
     CREATED: {label: "Préparer", endpoint: "prepare"},
     PREPARED: {label: "Distribuer", endpoint: "distribute"},
@@ -157,25 +159,50 @@ function renderSessionActions(session) {
 
     const action = SESSION_ACTIONS[session.status];
 
-    if (!action) {
-        return;
+    if (action) {
+        const button = document.createElement("button");
+        button.textContent = action.label;
+
+        button.addEventListener("click", async () => {
+            clearError();
+
+            try {
+                await apiPost(`${API_BASE}/${session.id}/${action.endpoint}`);
+                await renderSessionDetail();
+            } catch (err) {
+                showError(err.message);
+            }
+        });
+
+        container.appendChild(button);
     }
 
-    const button = document.createElement("button");
-    button.textContent = action.label;
+    if (CANCELLABLE_STATUSES.includes(session.status)) {
+        const cancelButton = document.createElement("button");
+        cancelButton.textContent = "Forcer l'arrêt";
+        cancelButton.className = "btn-danger";
 
-    button.addEventListener("click", async () => {
-        clearError();
+        cancelButton.addEventListener("click", async () => {
+            const confirmed = window.confirm(
+                "Forcer l'arrêt de cette session ? Toutes les cartes non retournées seront libérées de l'inventaire. Cette action est irréversible."
+            );
 
-        try {
-            await apiPost(`${API_BASE}/${session.id}/${action.endpoint}`);
-            await renderSessionDetail();
-        } catch (err) {
-            showError(err.message);
-        }
-    });
+            if (!confirmed) {
+                return;
+            }
 
-    container.appendChild(button);
+            clearError();
+
+            try {
+                await apiPost(`${API_BASE}/${session.id}/cancel`);
+                await renderSessionDetail();
+            } catch (err) {
+                showError(err.message);
+            }
+        });
+
+        container.appendChild(cancelButton);
+    }
 }
 
 function renderAssignments(session) {

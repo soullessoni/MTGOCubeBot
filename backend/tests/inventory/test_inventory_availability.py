@@ -106,6 +106,32 @@ def test_available_reduced_across_multiple_sessions(db_session):
     assert service.get_available_quantity(card) == 1
 
 
+def test_cancelled_assignment_does_not_reduce_availability(db_session):
+    card = Card(name="Black Lotus")
+
+    db_session.add(card)
+    db_session.commit()
+
+    service = InventoryService(db_session)
+    service.set_quantity(card, 1)
+
+    session = LoanSession(status="CANCELLED")
+
+    session.assignments.append(
+        LoanAssignment(
+            card_id=card.id,
+            player_name="Alice",
+            quantity=1,
+            status="CANCELLED",
+        )
+    )
+
+    db_session.add(session)
+    db_session.commit()
+
+    assert service.get_available_quantity(card) == 1
+
+
 def test_available_is_zero_for_unknown_card(db_session):
     card = Card(name="Does Not Exist")
 

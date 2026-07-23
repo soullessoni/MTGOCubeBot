@@ -72,3 +72,18 @@ class LoanAssignmentService:
         )
 
         return assignment
+
+    def force_cancel(
+            self,
+            assignment: LoanAssignment,
+    ) -> LoanAssignment:
+        self.status_service.force_cancel(
+            assignment,
+        )
+
+        self.db.commit()
+        self.db.refresh(
+            assignment,
+        )
+
+        return assignment

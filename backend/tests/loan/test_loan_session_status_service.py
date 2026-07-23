@@ -91,3 +91,61 @@ def test_completed_cannot_restart():
 
     with pytest.raises(ValueError):
         service.start(session)
+
+
+def test_cancel_from_created():
+    session = LoanSession(
+        status="CREATED",
+    )
+
+    service = LoanSessionStatusService()
+
+    service.cancel(session)
+
+    assert session.status == "CANCELLED"
+
+
+def test_cancel_from_ready():
+    session = LoanSession(
+        status="READY",
+    )
+
+    service = LoanSessionStatusService()
+
+    service.cancel(session)
+
+    assert session.status == "CANCELLED"
+
+
+def test_cancel_from_in_progress():
+    session = LoanSession(
+        status="IN_PROGRESS",
+    )
+
+    service = LoanSessionStatusService()
+
+    service.cancel(session)
+
+    assert session.status == "CANCELLED"
+
+
+def test_cannot_cancel_completed_session():
+    session = LoanSession(
+        status="COMPLETED",
+    )
+
+    service = LoanSessionStatusService()
+
+    with pytest.raises(ValueError):
+        service.cancel(session)
+
+
+def test_cannot_cancel_twice():
+    session = LoanSession(
+        status="CANCELLED",
+    )
+
+    service = LoanSessionStatusService()
+
+    with pytest.raises(ValueError):
+        service.cancel(session)

@@ -9,18 +9,23 @@ class LoanSessionStatusService:
     READY = "READY"
     IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
+    CANCELLED = "CANCELLED"
 
     ALLOWED_TRANSITIONS = {
         CREATED: [
             READY,
+            CANCELLED,
         ],
         READY: [
             IN_PROGRESS,
+            CANCELLED,
         ],
         IN_PROGRESS: [
             COMPLETED,
+            CANCELLED,
         ],
         COMPLETED: [],
+        CANCELLED: [],
     }
 
     def __init__(self):
@@ -63,6 +68,16 @@ class LoanSessionStatusService:
         return self._transition(
             session,
             self.COMPLETED,
+        )
+
+    def cancel(
+            self,
+            session: LoanSession,
+    ) -> LoanSession:
+
+        return self._transition(
+            session,
+            self.CANCELLED,
         )
 
     def _transition(

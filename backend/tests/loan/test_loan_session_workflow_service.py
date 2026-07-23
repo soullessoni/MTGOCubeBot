@@ -367,3 +367,59 @@ def test_cannot_return_twice(db_session):
         service.return_card(
             assignment,
         )
+
+
+def test_force_cancel_cancels_session_and_active_assignments(db_session):
+    card = Card(
+        name="Black Lotus",
+    )
+
+    session = LoanSession(
+        status="IN_PROGRESS",
+    )
+
+    prepared_assignment = LoanAssignment(
+        card=card,
+        status="PREPARED",
+        player_name="Alice",
+        quantity=1,
+    )
+
+    returned_assignment = LoanAssignment(
+        card=card,
+        status="RETURNED",
+        player_name="Bob",
+        quantity=1,
+    )
+
+    session.assignments.append(prepared_assignment)
+    session.assignments.append(returned_assignment)
+
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanSessionWorkflowService(
+        db_session,
+    )
+
+    service.force_cancel(session)
+
+    assert session.status == "CANCELLED"
+    assert prepared_assignment.status == "CANCELLED"
+    assert returned_assignment.status == "RETURNED"
+
+
+def test_cannot_force_cancel_completed_session(db_session):
+    session = LoanSession(
+        status="COMPLETED",
+    )
+
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanSessionWorkflowService(
+        db_session,
+    )
+
+    with pytest.raises(ValueError):
+        service.force_cancel(session)

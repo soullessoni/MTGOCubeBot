@@ -74,7 +74,9 @@ class InventoryService:
             )
             .filter(
                 LoanAssignment.card_id == card.id,
-                LoanAssignment.status != "RETURNED",
+                LoanAssignment.status.notin_(
+                    ["RETURNED", "CANCELLED"]
+                ),
             )
             .scalar()
         )

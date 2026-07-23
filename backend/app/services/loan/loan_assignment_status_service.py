@@ -7,21 +7,32 @@ class LoanAssignmentStatusService:
     DISTRIBUTED = "DISTRIBUTED"
     CONFIRMED = "CONFIRMED"
     RETURNED = "RETURNED"
+    CANCELLED = "CANCELLED"
+
+    TERMINAL_STATUSES = (
+        RETURNED,
+        CANCELLED,
+    )
 
     ALLOWED_TRANSITIONS = {
         CREATED: [
             PREPARED,
+            CANCELLED,
         ],
         PREPARED: [
             DISTRIBUTED,
+            CANCELLED,
         ],
         DISTRIBUTED: [
             CONFIRMED,
+            CANCELLED,
         ],
         CONFIRMED: [
             RETURNED,
+            CANCELLED,
         ],
         RETURNED: [],
+        CANCELLED: [],
     }
 
     def mark_prepared(
@@ -59,6 +70,17 @@ class LoanAssignmentStatusService:
             assignment,
             self.RETURNED,
         )
+
+    def force_cancel(
+            self,
+            assignment: LoanAssignment,
+    ) -> LoanAssignment:
+        if assignment.status in self.TERMINAL_STATUSES:
+            return assignment
+
+        assignment.status = self.CANCELLED
+
+        return assignment
 
     def _transition(
             self,

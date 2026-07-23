@@ -120,3 +120,22 @@ class LoanSessionWorkflowService:
         self.db.refresh(session)
 
         return session
+
+    def force_cancel(
+            self,
+            session: LoanSession,
+    ) -> LoanSession:
+
+        self.status_service.cancel(
+            session,
+        )
+
+        for assignment in session.assignments:
+            self.assignment_service.force_cancel(
+                assignment,
+            )
+
+        self.db.commit()
+        self.db.refresh(session)
+
+        return session

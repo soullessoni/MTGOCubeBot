@@ -29,9 +29,17 @@ app.include_router(
     inventory_router,
 )
 
+
+class NoCacheStaticFiles(StaticFiles):
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 app.mount(
     "/dashboard",
-    StaticFiles(
+    NoCacheStaticFiles(
         directory=Path(__file__).parent / "web" / "static",
         html=True,
     ),
