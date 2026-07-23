@@ -9,4 +9,7 @@ __all__ = [
     "Card",
     "Cube",
     "CubeCard",
+    "InventoryItem",
+    "LoanAssignment",
+    "LoanSession",
 ]

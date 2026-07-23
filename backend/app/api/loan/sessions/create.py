@@ -58,15 +58,21 @@ def create_loan_session(
     planning_service = LoanPlanningService(
         inventory_service,
     )
-
-    plan = planning_service.generate(
+    
+    planning_result = planning_service.generate(
         pools,
     )
+
+    if planning_result.conflicts:
+        raise HTTPException(
+            status_code=409,
+            detail="Loan conflicts detected",
+        )
 
     use_case = CreateLoanSessionUseCase(
         db,
     )
 
     return use_case.execute(
-        plan,
+        planning_result.requests,
     )

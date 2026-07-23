@@ -1,0 +1,2 @@
+class CardNotFoundError(Exception):
+    pass

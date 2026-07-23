@@ -1,22 +1,25 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.loan.draft import (
     CreateLoanSessionFromDraftRequest,
 )
-from app.use_cases.loan import (
-    CreateLoanSessionFromDraftUseCase,
-)
-
 from app.schemas.loan.loan_session import (
     LoanSessionResponse,
+)
+from app.services.loan.exceptions import (
+    CardNotFoundError,
+)
+from app.use_cases.loan import (
+    CreateLoanSessionFromDraftUseCase,
 )
 
 
 router = APIRouter(
     tags=["loan"],
 )
+
 
 @router.post(
     "/from-draft",
@@ -26,14 +29,20 @@ def create_from_draft(
     payload: CreateLoanSessionFromDraftRequest,
     db: Session = Depends(get_db),
 ):
-
     use_case = CreateLoanSessionFromDraftUseCase(
         db,
     )
 
-    return use_case.execute(
-        players=[
-            player.model_dump()
-            for player in payload.players
-        ],
-    )
+    try:
+        return use_case.execute(
+            players=[
+                player.model_dump()
+                for player in payload.players
+            ],
+        )
+
+    except CardNotFoundError as error:
+        raise HTTPException(
+            status_code=404,
+            detail=str(error),
+        )
