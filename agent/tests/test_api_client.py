@@ -39,6 +39,26 @@ def test_get_session():
     assert result["id"] == 1
 
 
+def test_list_sessions():
+    def handler(request):
+        assert request.url.path == "/loan/sessions/"
+
+        return httpx.Response(
+            200,
+            json=[
+                {"id": 1, "status": "CREATED", "assignments": []},
+                {"id": 2, "status": "COMPLETED", "assignments": []},
+            ],
+        )
+
+    client = make_client(handler)
+
+    result = client.list_sessions()
+
+    assert len(result) == 2
+    assert result[0]["id"] == 1
+
+
 def test_link_discord_identity_sends_payload():
     captured = {}
 

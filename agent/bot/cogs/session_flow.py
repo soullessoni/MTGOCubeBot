@@ -96,6 +96,44 @@ class PlayerSelectView(discord.ui.View):
         )
 
 
+class CorrectMtgoUsernameView(discord.ui.View):
+    """Sent alongside the initial DM card list. Lets the player reopen the
+    pseudo modal if they mistyped it — resubmitting restarts identification
+    from that point (re-links every assignment and resends a fresh card
+    list + action buttons).
+    """
+
+    def __init__(
+            self,
+            cog: "SessionFlowCog",
+            session_id: int,
+            player_name: str,
+    ):
+        super().__init__(timeout=None)
+        self.cog = cog
+        self.session_id = session_id
+        self.player_name = player_name
+
+        button = discord.ui.Button(
+            label="Corriger mon pseudo MTGO",
+            style=discord.ButtonStyle.secondary,
+            custom_id=f"session:{session_id}:correct:{player_name}",
+        )
+
+        async def callback(interaction: discord.Interaction):
+            await interaction.response.send_modal(
+                MtgoUsernameModal(
+                    self.cog,
+                    self.session_id,
+                    self.player_name,
+                )
+            )
+
+        button.callback = callback
+
+        self.add_item(button)
+
+
 class AssignmentActionView(discord.ui.View):
     """Sent by DM for a single card assignment. Shows the one action that
     makes sense for the assignment's current status, if any.
@@ -238,7 +276,7 @@ class SessionFlowCog(commands.Cog):
         ),
     )
     @app_commands.describe(
-        session_id="Identifiant de la session de prêt (voir le dashboard)",
+        session_id="Session de prêt active à ouvrir",
     )
     async def draft_session(
             self,
@@ -294,6 +332,52 @@ class SessionFlowCog(commands.Cog):
             f"Salon créé : {channel.mention}",
             ephemeral=True,
         )
+
+    @draft_session.autocomplete("session_id")
+    async def draft_session_id_autocomplete(
+            self,
+            interaction: discord.Interaction,
+            current: str,
+    ) -> list[app_commands.Choice[int]]:
+        logger.info(
+            "Autocomplete session_id invoked, current=%r",
+            current,
+        )
+
+        try:
+            sessions = self.api_client.list_sessions()
+        except CubeBotApiError as error:
+            logger.warning(
+                "Autocomplete failed to list sessions: %s",
+                error.detail,
+            )
+            return []
+
+        choices = []
+
+        for session in sessions:
+            if session["status"] in TERMINAL_SESSION_STATUSES:
+                continue
+
+            players = sorted({
+                assignment["player_name"]
+                for assignment in session["assignments"]
+            })
+
+            label = (
+                f"#{session['id']} ({session['status']}) — "
+                f"{', '.join(players) if players else 'aucun joueur'}"
+            )[:100]
+
+            if current and current not in str(session["id"]) \
+                    and current.lower() not in label.lower():
+                continue
+
+            choices.append(
+                app_commands.Choice(name=label, value=session["id"])
+            )
+
+        return choices[:25]
 
     async def complete_identification(
             self,
@@ -351,7 +435,14 @@ class SessionFlowCog(commands.Cog):
                     f"(statut : {assignment['status']})"
                 )
 
-            await dm_channel.send("\n".join(lines))
+            await dm_channel.send(
+                "\n".join(lines),
+                view=CorrectMtgoUsernameView(
+                    self,
+                    session_id,
+                    player_name,
+                ),
+            )
 
             for assignment in linked_assignments:
                 await dm_channel.send(

@@ -30,6 +30,12 @@ class CubeBotApiClient:
             f"/loan/sessions/{session_id}",
         )
 
+    def list_sessions(self) -> list[dict]:
+        return self._request(
+            "GET",
+            "/loan/sessions/",
+        )
+
     def link_discord_identity(
             self,
             assignment_id: int,
@@ -62,7 +68,7 @@ class CubeBotApiClient:
             method: str,
             path: str,
             **kwargs,
-    ) -> dict:
+    ) -> dict | list:
         response = self._client.request(method, path, **kwargs)
 
         if response.status_code >= 400:

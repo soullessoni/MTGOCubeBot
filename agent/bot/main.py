@@ -41,6 +41,14 @@ class CubeBot(commands.Bot):
             guild = discord.Object(id=self.config.guild_id)
             self.tree.copy_global_to(guild=guild)
             await self.tree.sync(guild=guild)
+
+            # Wipe any stale global registration from a previous run made
+            # before DISCORD_GUILD_ID was set — otherwise Discord shows
+            # both the guild-scoped command (instant, up to date) and the
+            # old global one (up to an hour to update/remove) side by
+            # side in the picker.
+            self.tree.clear_commands(guild=None)
+            await self.tree.sync()
         else:
             await self.tree.sync()
 
