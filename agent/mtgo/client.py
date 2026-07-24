@@ -494,6 +494,20 @@ def is_logged_in(window) -> bool:
     return find_by_automation_id(window, "UsernameTextBox") is None
 
 
+_TYPE_KEYS_SPECIAL_CHARS = set("+^%~(){}[]")
+
+
+def _escape_for_type_keys(text: str) -> str:
+    """pywinauto's type_keys() treats +^%~(){}[] as modifier/grouping
+    syntax, not literal characters — a password containing any of these
+    would otherwise be typed wrong (or split across the wrong fields)
+    with no visible error. Wrapping each one in its own braces sends it
+    literally."""
+    return "".join(
+        f"{{{ch}}}" if ch in _TYPE_KEYS_SPECIAL_CHARS else ch for ch in text
+    )
+
+
 def login(window, username: str | None = None, password: str | None = None) -> None:
     """Fill the login screen and submit. Credentials default to the
     MTGO_USERNAME/MTGO_PASSWORD environment variables (see .env.example)
@@ -528,13 +542,23 @@ def login(window, username: str | None = None, password: str | None = None) -> N
 
     username_box.set_focus()
     username_box.type_keys("^a{DELETE}")
-    username_box.type_keys(username, with_spaces=True)
+    username_box.type_keys(_escape_for_type_keys(username), with_spaces=True)
+    time.sleep(0.3)
 
     password_box.set_focus()
     password_box.type_keys("^a{DELETE}")
-    password_box.type_keys(password, with_spaces=True)
+    password_box.type_keys(_escape_for_type_keys(password), with_spaces=True)
+    time.sleep(0.3)
 
     login_btn.click_input()
+    time.sleep(1.0)
+
+    # a disabled/greyed-out button (empty or rejected field) eats the
+    # click silently — invoke() goes through the button's own click
+    # handler instead of a synthetic mouse event, which is more likely
+    # to register if the first click_input() didn't visibly do anything
+    if find_by_automation_id(window, "UsernameTextBox") is not None:
+        login_btn.invoke()
 
 
 def wait_for_logged_in(window, timeout: float = 90.0, interval: float = 3.0) -> bool:
