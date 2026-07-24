@@ -306,10 +306,24 @@ class SessionFlowCog(commands.Cog):
             )
             return
 
+        channel_name = f"draft-session-{session_id}"
+
+        existing_channel = discord.utils.get(
+            interaction.guild.text_channels,
+            name=channel_name,
+        )
+
+        if existing_channel is not None:
+            await interaction.followup.send(
+                f"Le salon existe déjà : {existing_channel.mention}",
+                ephemeral=True,
+            )
+            return
+
         category = self._find_category(interaction.guild)
 
         channel = await interaction.guild.create_text_channel(
-            name=f"draft-session-{session_id}",
+            name=channel_name,
             category=category,
         )
 
