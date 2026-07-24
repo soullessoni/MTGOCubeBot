@@ -427,7 +427,12 @@ class SessionFlowCog(commands.Cog):
         try:
             dm_channel = await interaction.user.create_dm()
 
-            lines = [f"**Session de prêt #{session_id} — tes cartes**"]
+            lines = [
+                f"**Session de prêt #{session_id} — tes cartes**",
+                f"Identifié comme **{player_name}**, "
+                f"pseudo MTGO enregistré : **{mtgo_username}**",
+                "",
+            ]
 
             for assignment in linked_assignments:
                 lines.append(
@@ -460,7 +465,8 @@ class SessionFlowCog(commands.Cog):
             return
 
         await interaction.followup.send(
-            "Pseudo confirmé, tu as reçu tes cartes en message privé.",
+            f"Pseudo MTGO enregistré : **{mtgo_username}** — tu as reçu "
+            f"tes cartes en message privé.",
             ephemeral=True,
         )
 
