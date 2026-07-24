@@ -10,15 +10,30 @@ about automation_ids directly.
 
 from __future__ import annotations
 
+import os
+import subprocess
 import time
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from dotenv import load_dotenv
 from pywinauto import Desktop
+
+load_dotenv()
 
 LISTS_DIR = Path(__file__).parent / "lists"
 
 BINDER_ROW_TEXT = "WotC.MtGO.Client.Model.Core.Collection.Binder"
+
+MTGO_APPREF_PATH = (
+    Path(os.environ["APPDATA"])
+    / "Microsoft"
+    / "Windows"
+    / "Start Menu"
+    / "Programs"
+    / "Daybreak Game Company LLC"
+    / "Magic The Gathering Online .appref-ms"
+)
 
 
 class MtgoAutomationError(RuntimeError):
@@ -455,3 +470,107 @@ def dismiss_added_to_collection_popup(window, timeout: float = 5.0) -> bool:
                     return True
         time.sleep(0.5)
     return False
+
+
+def launch_mtgo(timeout: float = 60.0, interval: float = 3.0):
+    """Start the MTGO client via its ClickOnce shortcut and wait for its
+    window to appear. Returns the window, or None if it never showed up.
+    Does nothing about logging in — see `login()`."""
+    subprocess.Popen(
+        ["cmd", "/c", "start", "", str(MTGO_APPREF_PATH)],
+        shell=False,
+    )
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        window = find_mtgo_window()
+        if window is not None:
+            return window
+        time.sleep(interval)
+    return None
+
+
+def is_logged_in(window) -> bool:
+    return find_by_automation_id(window, "UsernameTextBox") is None
+
+
+def login(window, username: str | None = None, password: str | None = None) -> None:
+    """Fill the login screen and submit. Credentials default to the
+    MTGO_USERNAME/MTGO_PASSWORD environment variables (see .env.example)
+    so callers never need to handle the raw password themselves."""
+    username = username or os.environ.get("MTGO_USERNAME")
+    password = password or os.environ.get("MTGO_PASSWORD")
+    if not username or not password:
+        raise MtgoAutomationError(
+            "MTGO_USERNAME/MTGO_PASSWORD are not set — copy .env.example to "
+            ".env and fill them in"
+        )
+
+    if is_logged_in(window):
+        return
+
+    username_box = find_by_automation_id(window, "UsernameTextBox")
+    password_box = find_by_automation_id(window, "PasswordBox")
+    login_btn = None
+    for element in window.descendants():
+        try:
+            text = element.window_text()
+            control = element.friendly_class_name()
+            aid = element.element_info.automation_id
+        except Exception:
+            continue
+        if text.strip() == "LOG IN" and control == "Button" and aid == "LoginButton":
+            login_btn = element
+            break
+
+    if username_box is None or password_box is None or login_btn is None:
+        raise MtgoAutomationError("login screen fields not found")
+
+    username_box.set_focus()
+    username_box.type_keys("^a{DELETE}")
+    username_box.type_keys(username, with_spaces=True)
+
+    password_box.set_focus()
+    password_box.type_keys("^a{DELETE}")
+    password_box.type_keys(password, with_spaces=True)
+
+    login_btn.click_input()
+
+
+def wait_for_logged_in(window, timeout: float = 90.0, interval: float = 3.0) -> bool:
+    """MTGO's post-login load is slow (30s+) even on a good connection —
+    poll rather than assume a fixed delay."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if is_logged_in(window):
+            return True
+        time.sleep(interval)
+    return False
+
+
+def kill_mtgo() -> None:
+    subprocess.run(
+        ["taskkill", "/IM", "MTGO.exe", "/F"],
+        capture_output=True,
+    )
+    time.sleep(2.0)
+
+
+def restart_and_login(username: str | None = None, password: str | None = None):
+    """Kill any running MTGO instance, relaunch it, log in, and wait for
+    the post-login load to finish. Meant to be called by the bot's own
+    process at its own startup (or by whatever will eventually expose a
+    "reconnect" action) — never invoke this interactively on the user's
+    behalf without them having explicitly triggered it themselves."""
+    kill_mtgo()
+
+    window = launch_mtgo()
+    if window is None:
+        raise MtgoAutomationError("MTGO window did not appear after launch")
+
+    login(window, username=username, password=password)
+
+    if not wait_for_logged_in(window):
+        raise MtgoAutomationError("login did not complete within the timeout")
+
+    return window
