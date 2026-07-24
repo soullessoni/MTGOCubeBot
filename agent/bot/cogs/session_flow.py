@@ -1,8 +1,16 @@
+import logging
+import re
+
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands, tasks
 
 from bot.api_client import CubeBotApiClient, CubeBotApiError
+
+logger = logging.getLogger(__name__)
+
+SESSION_CHANNEL_PATTERN = re.compile(r"^draft-session-(\d+)$")
+TERMINAL_SESSION_STATUSES = ("COMPLETED", "CANCELLED")
 
 
 def _card_label(assignment: dict) -> str:
@@ -153,9 +161,74 @@ class SessionFlowCog(commands.Cog):
             self,
             bot: commands.Bot,
             api_client: CubeBotApiClient,
+            category_name: str,
+            cleanup_interval_minutes: float,
     ):
         self.bot = bot
         self.api_client = api_client
+        self.category_name = category_name
+
+        self.cleanup_finished_sessions.change_interval(
+            minutes=cleanup_interval_minutes,
+        )
+        self.cleanup_finished_sessions.start()
+
+    def cog_unload(self):
+        self.cleanup_finished_sessions.cancel()
+
+    def _find_category(
+            self,
+            guild: discord.Guild,
+    ) -> discord.CategoryChannel | None:
+        return discord.utils.get(
+            guild.categories,
+            name=self.category_name,
+        )
+
+    @tasks.loop(minutes=2)
+    async def cleanup_finished_sessions(self):
+        for guild in self.bot.guilds:
+            category = self._find_category(guild)
+
+            if category is None:
+                continue
+
+            for channel in category.text_channels:
+                match = SESSION_CHANNEL_PATTERN.match(channel.name)
+
+                if not match:
+                    continue
+
+                session_id = int(match.group(1))
+
+                try:
+                    session = self.api_client.get_session(session_id)
+                except CubeBotApiError as error:
+                    logger.warning(
+                        "Impossible de vérifier la session %s : %s",
+                        session_id,
+                        error.detail,
+                    )
+                    continue
+
+                if session["status"] in TERMINAL_SESSION_STATUSES:
+                    logger.info(
+                        "Session %s %s — suppression du salon %s",
+                        session_id,
+                        session["status"],
+                        channel.name,
+                    )
+
+                    await channel.delete(
+                        reason=(
+                            f"Session de prêt {session_id} "
+                            f"{session['status'].lower()}"
+                        )
+                    )
+
+    @cleanup_finished_sessions.before_loop
+    async def before_cleanup_finished_sessions(self):
+        await self.bot.wait_until_ready()
 
     @app_commands.command(
         name="draft-session",
@@ -195,9 +268,19 @@ class SessionFlowCog(commands.Cog):
             )
             return
 
+        category = self._find_category(interaction.guild)
+
         channel = await interaction.guild.create_text_channel(
             name=f"draft-session-{session_id}",
+            category=category,
         )
+
+        if category is None:
+            await interaction.followup.send(
+                f"⚠️ Catégorie \"{self.category_name}\" introuvable sur ce "
+                f"serveur — le salon a été créé hors catégorie.",
+                ephemeral=True,
+            )
 
         await channel.send(
             f"**Session de prêt #{session_id}**\n"
@@ -296,8 +379,6 @@ class SessionFlowCog(commands.Cog):
             assignment_id: int,
             action: str,
     ):
-        await interaction.response.defer(ephemeral=True)
-
         try:
             if action == "confirm":
                 result = self.api_client.confirm_assignment(
@@ -308,18 +389,18 @@ class SessionFlowCog(commands.Cog):
                     assignment_id,
                 )
         except CubeBotApiError as error:
-            await interaction.followup.send(
+            await interaction.response.send_message(
                 f"Action impossible : {error.detail}",
                 ephemeral=True,
             )
             return
 
-        await interaction.followup.send(
-            f"Statut mis à jour : {result['status']}",
-            ephemeral=True,
+        # Respond by editing the clicked message directly, in one step —
+        # more reliably reflected client-side than defer + a separate
+        # followup + a separate message.edit() call.
+        await interaction.response.edit_message(
+            content=(
+                f"{_card_label(result)} — statut : {result['status']}"
+            ),
+            view=AssignmentActionView(self, result),
         )
-
-        if interaction.message:
-            await interaction.message.edit(
-                view=AssignmentActionView(self, result),
-            )

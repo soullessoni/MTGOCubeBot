@@ -29,7 +29,12 @@ class CubeBot(commands.Bot):
 
     async def setup_hook(self):
         await self.add_cog(
-            SessionFlowCog(self, self.api_client)
+            SessionFlowCog(
+                self,
+                self.api_client,
+                self.config.category_name,
+                self.config.cleanup_interval_minutes,
+            )
         )
 
         if self.config.guild_id:
@@ -38,6 +43,20 @@ class CubeBot(commands.Bot):
             await self.tree.sync(guild=guild)
         else:
             await self.tree.sync()
+
+    async def on_ready(self):
+        logging.info(
+            "Logged in as %s (id=%s)",
+            self.user,
+            self.user.id,
+        )
+
+        for guild in self.guilds:
+            logging.info(
+                "Connected to guild: %s (id=%s)",
+                guild.name,
+                guild.id,
+            )
 
 
 def main():

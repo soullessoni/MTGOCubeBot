@@ -11,6 +11,8 @@ class BotConfig:
     discord_token: str
     guild_id: int | None
     backend_api_url: str
+    category_name: str
+    cleanup_interval_minutes: float
 
     @classmethod
     def from_env(cls) -> "BotConfig":
@@ -30,8 +32,19 @@ class BotConfig:
             "http://localhost:8000",
         )
 
+        category_name = os.environ.get(
+            "DISCORD_CATEGORY_NAME",
+            "Automated Draft on MTGO",
+        )
+
+        cleanup_interval_minutes = float(
+            os.environ.get("CLEANUP_INTERVAL_MINUTES", "2")
+        )
+
         return cls(
             discord_token=token,
             guild_id=guild_id,
             backend_api_url=backend_api_url,
+            category_name=category_name,
+            cleanup_interval_minutes=cleanup_interval_minutes,
         )
