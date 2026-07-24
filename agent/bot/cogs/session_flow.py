@@ -182,6 +182,11 @@ class AssignmentActionView(discord.ui.View):
         )
 
         async def callback(interaction: discord.Interaction):
+            logger.info(
+                "Button clicked: assignment=%s action=%s",
+                self.assignment_id,
+                action,
+            )
             await self.cog.handle_assignment_action(
                 interaction,
                 self.assignment_id,
@@ -240,7 +245,9 @@ class SessionFlowCog(commands.Cog):
                 session_id = int(match.group(1))
 
                 try:
-                    session = self.api_client.get_session(session_id)
+                    session = await self.api_client.get_session(
+                        session_id,
+                    )
                 except CubeBotApiError as error:
                     logger.warning(
                         "Impossible de vérifier la session %s : %s",
@@ -286,7 +293,7 @@ class SessionFlowCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         try:
-            session = self.api_client.get_session(session_id)
+            session = await self.api_client.get_session(session_id)
         except CubeBotApiError as error:
             await interaction.followup.send(
                 f"Session introuvable ou erreur API : {error.detail}",
@@ -359,7 +366,7 @@ class SessionFlowCog(commands.Cog):
         )
 
         try:
-            sessions = self.api_client.list_sessions()
+            sessions = await self.api_client.list_sessions()
         except CubeBotApiError as error:
             logger.warning(
                 "Autocomplete failed to list sessions: %s",
@@ -403,7 +410,7 @@ class SessionFlowCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         try:
-            session = self.api_client.get_session(session_id)
+            session = await self.api_client.get_session(session_id)
         except CubeBotApiError as error:
             await interaction.followup.send(
                 f"Erreur lors de la récupération de la session : "
@@ -422,7 +429,7 @@ class SessionFlowCog(commands.Cog):
 
         for assignment in matching_assignments:
             try:
-                linked = self.api_client.link_discord_identity(
+                linked = await self.api_client.link_discord_identity(
                     assignment["id"],
                     str(interaction.user.id),
                     mtgo_username,
@@ -492,11 +499,11 @@ class SessionFlowCog(commands.Cog):
     ):
         try:
             if action == "confirm":
-                result = self.api_client.confirm_assignment(
+                result = await self.api_client.confirm_assignment(
                     assignment_id,
                 )
             else:
-                result = self.api_client.return_assignment(
+                result = await self.api_client.return_assignment(
                     assignment_id,
                 )
         except CubeBotApiError as error:

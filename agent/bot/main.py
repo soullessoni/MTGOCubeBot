@@ -52,6 +52,17 @@ class CubeBot(commands.Bot):
         else:
             await self.tree.sync()
 
+    async def on_interaction(self, interaction: discord.Interaction):
+        # Deliberately logs only the interaction's shape, not its data —
+        # modal submits carry the raw text a player typed (e.g. their MTGO
+        # pseudo) and that shouldn't end up in plaintext logs.
+        logging.info(
+            "on_interaction: type=%s custom_id=%s command=%s",
+            interaction.type,
+            (interaction.data or {}).get("custom_id"),
+            getattr(interaction.command, "qualified_name", None),
+        )
+
     async def on_ready(self):
         logging.info(
             "Logged in as %s (id=%s)",
