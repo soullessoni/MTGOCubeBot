@@ -23,7 +23,10 @@ re-derive.
 - `trade_add_card.py` — search for a card by name in a trade window and
   double-click it to add it. Only works for the *counterparty's*
   binder (see below) — you cannot add your own cards to a trade this
-  way.
+  way. Targets the `<card>_<numericId>_CardQuantityControl` element
+  rather than the `Collection-CardStack-<card>` image, since the
+  latter can carry a stale "ghost" automation peer for a previously
+  searched card (see memory for details).
 
 ## The mechanic these scripts proved out
 
@@ -38,8 +41,10 @@ binder selector — the player then picks their cards from it and
 submits, and the owner submits + confirms to close the loop. Verified
 end to end against two real MTGO accounts on 2026-07-24.
 
-Retrieving cards (the return leg) should be the mirror of this — not
-yet tested.
+Retrieving cards (the return leg) is the mirror of this, with one
+inversion: since the bot is the one browsing the player's binder and
+adding cards, the **bot** must click Submit (not the player). Validated
+end to end on 2026-07-24.
 
 ## Not yet built
 A real `agent/mtgo/client.py`-style module wrapping this into reusable,

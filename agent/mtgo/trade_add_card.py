@@ -100,14 +100,21 @@ def main():
 
     time.sleep(1.5)
 
-    prefix = f"Collection-CardStack-{card_name}"
+    # The `Collection-CardStack-<name>` Image element is unreliable: MTGO's
+    # virtualized card grid can leave stale "ghost" peers for a previously
+    # searched card at the same screen coordinates as the currently displayed
+    # one, so double-clicking it can add the wrong card. The
+    # `<name>_<numericId>_CardQuantityControl` element embeds a card-specific
+    # numeric id and does not exhibit this staleness — target that instead.
+    prefix = f"{card_name}_"
+    suffix = "_CardQuantityControl"
     card_element = None
 
     for element in window.descendants():
         info = element.element_info
         automation_id = getattr(info, "automation_id", "") or ""
 
-        if automation_id.startswith(prefix):
+        if automation_id.startswith(prefix) and automation_id.endswith(suffix):
             card_element = element
             break
 
