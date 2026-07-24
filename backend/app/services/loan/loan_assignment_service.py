@@ -73,6 +73,22 @@ class LoanAssignmentService:
 
         return assignment
 
+    def link_discord(
+            self,
+            assignment: LoanAssignment,
+            discord_user_id: str,
+            mtgo_username: str,
+    ) -> LoanAssignment:
+        assignment.discord_user_id = discord_user_id
+        assignment.mtgo_username = mtgo_username
+
+        self.db.commit()
+        self.db.refresh(
+            assignment,
+        )
+
+        return assignment
+
     def force_cancel(
             self,
             assignment: LoanAssignment,

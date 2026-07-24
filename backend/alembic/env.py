@@ -6,6 +6,12 @@ from sqlalchemy import pool
 from alembic import context
 from app.db.base import Base
 
+# Import all model modules so they register their tables on
+# Base.metadata before autogenerate compares it against the database —
+# without this, target_metadata is empty and autogenerate proposes
+# dropping every existing table.
+import app.models  # noqa: F401,E402
+
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config

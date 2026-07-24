@@ -55,6 +55,16 @@ class LoanAssignment(Base):
         default=lambda: datetime.now(UTC),
     )
 
+    discord_user_id = Column(
+        String(32),
+        nullable=True,
+    )
+
+    mtgo_username = Column(
+        String(255),
+        nullable=True,
+    )
+
     session = relationship(
         "LoanSession",
         back_populates="assignments",
