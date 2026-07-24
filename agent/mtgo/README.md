@@ -27,6 +27,17 @@ re-derive.
   rather than the `Collection-CardStack-<card>` image, since the
   latter can carry a stale "ghost" automation peer for a previously
   searched card (see memory for details).
+- `import_binder.py` — **the real way to populate a binder.** Writes a
+  `.dek` XML file (card names only, `CatID="0"` is fine — MTGO resolves
+  by name) to a local `lists/` folder (gitignored) and drives the
+  binder-creation dialog's "Import" flow to load it in one shot. Use
+  this instead of hand-filling a binder by search+click — see below.
+- `stress_fill_binder.py` — **kept only as a cautionary reference.**
+  Fills a binder by searching + double-clicking each card one at a
+  time, with retry/verification against the binder's live card count.
+  Measured at ~11s/card and only ~88% success even with active polling
+  (MTGO's own search rendering is slow and variable, not a bug in this
+  script). Do not use this for real sessions — see `import_binder.py`.
 
 ## The mechanic these scripts proved out
 
@@ -45,6 +56,14 @@ Retrieving cards (the return leg) is the mirror of this, with one
 inversion: since the bot is the one browsing the player's binder and
 adding cards, the **bot** must click Submit (not the player). Validated
 end to end on 2026-07-24.
+
+**Populate binders via import, not search+click.** MTGO can import a
+binder from a `.dek` file (a trivial XML format — card `Name` alone is
+enough, no card-ID lookup needed) in a few seconds regardless of card
+count, with 100% reliability. Searching and double-clicking each card
+individually is 10x+ slower and meaningfully unreliable at MTGO's own
+search-rendering speed. See `import_binder.py` and the memory write-up
+for the full dialog-automation details.
 
 ## Not yet built
 A real `agent/mtgo/client.py`-style module wrapping this into reusable,

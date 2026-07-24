@@ -24,3 +24,6 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# MTGO generated lists (.dek exports/imports, scratch data)
+agent/mtgo/lists/
