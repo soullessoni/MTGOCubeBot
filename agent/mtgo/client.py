@@ -722,6 +722,36 @@ def accept_incoming_trade_request(
     time.sleep(1.5)
 
 
+def dismiss_trade_completed_popup(window, timeout: float = 5.0) -> bool:
+    """A separate "Trade Completed" dialog (distinct from "Added to your
+    Collection") can also linger after a trade and block subsequent
+    navigation on the main window — confirmed live: it silently ate a
+    HomeButton click, which in turn made the buddy list panel
+    unreachable and broke `ensure_buddy()`. Dismiss both popups after
+    every completed trade, not just the collection one."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for element in window.descendants():
+            try:
+                text = element.window_text()
+                control = element.friendly_class_name()
+            except Exception:
+                continue
+            if control == "Dialog" and text == "Trade Completed":
+                for sub in element.descendants():
+                    try:
+                        sub_text = sub.window_text()
+                        sub_control = sub.friendly_class_name()
+                    except Exception:
+                        continue
+                    if sub_text.strip() == "OK" and sub_control == "Button":
+                        sub.invoke()
+                        time.sleep(1.0)
+                        return True
+        time.sleep(0.5)
+    return False
+
+
 def dismiss_added_to_collection_popup(window, timeout: float = 5.0) -> bool:
     """The "Added to your Collection: N new items" popup that follows a
     completed trade must be dismissed via its `Close` button — the `OK`
