@@ -376,29 +376,40 @@ def ensure_buddy(window, username: str) -> None:
     home_btn = find_by_automation_id(window, "HomeButton")
     if home_btn is not None:
         home_btn.click_input()
-        time.sleep(1.5)
 
-    if is_buddy(window, username):
-        return
+    # MTGO's own screen-navigation and dialog rendering is genuinely
+    # slow and variable (a recurring theme throughout this module) — a
+    # fixed sleep here was observed to sometimes not be enough, causing
+    # a false "not a buddy" reading right after this same buddy was
+    # confirmed present moments earlier. Poll instead.
+    deadline = time.monotonic() + 6.0
+    while time.monotonic() < deadline:
+        if is_buddy(window, username):
+            return
+        time.sleep(0.5)
 
     add_btn = find_by_automation_id(window, "AddBuddyButton")
     if add_btn is None:
         raise MtgoAutomationError("AddBuddyButton not found")
     add_btn.click_input()
-    time.sleep(1.5)
 
     entry = None
     entry_btn = None
-    for element in window.descendants():
-        try:
-            control = element.friendly_class_name()
-            aid = element.element_info.automation_id
-        except Exception:
-            continue
-        if aid == "Entry" and control == "Edit":
-            entry = element
-        if aid == "Entrybutton":
-            entry_btn = element
+    deadline = time.monotonic() + 6.0
+    while time.monotonic() < deadline:
+        for element in window.descendants():
+            try:
+                control = element.friendly_class_name()
+                aid = element.element_info.automation_id
+            except Exception:
+                continue
+            if aid == "Entry" and control == "Edit":
+                entry = element
+            if aid == "Entrybutton":
+                entry_btn = element
+        if entry is not None and entry_btn is not None:
+            break
+        time.sleep(0.5)
 
     if entry is None or entry_btn is None:
         raise MtgoAutomationError("Add Buddy dialog fields not found")
@@ -407,10 +418,14 @@ def ensure_buddy(window, username: str) -> None:
     entry.type_keys(username, with_spaces=True)
     time.sleep(0.5)
     entry_btn.click_input()
-    time.sleep(1.5)
 
-    if not is_buddy(window, username):
-        raise MtgoAutomationError(f"buddy {username!r} was not added")
+    deadline = time.monotonic() + 6.0
+    while time.monotonic() < deadline:
+        if is_buddy(window, username):
+            return
+        time.sleep(0.5)
+
+    raise MtgoAutomationError(f"buddy {username!r} was not added")
 
 
 def request_trade_with_binder(window, buddy_name: str, binder_name: str) -> None:
@@ -425,6 +440,13 @@ def request_trade_with_binder(window, buddy_name: str, binder_name: str) -> None
     widget `ensure_buddy`/`is_buddy` use on the Home screen — so this
     switches to the Trade tab first.
     """
+    # A leftover "Trade Completed" or "Added to your Collection" popup
+    # from a just-finished trade can silently eat a HomeButton click and
+    # break ensure_buddy() on the very next attempt (confirmed live,
+    # repeatedly) — clear both defensively before doing anything else.
+    dismiss_trade_completed_popup(window, timeout=3)
+    dismiss_added_to_collection_popup(window, timeout=3)
+
     ensure_buddy(window, buddy_name)
 
     trade_tab = find_by_automation_id(window, "TradeButton")
