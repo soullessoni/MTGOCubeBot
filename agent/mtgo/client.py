@@ -455,6 +455,28 @@ def request_trade_with_binder(window, buddy_name: str, binder_name: str) -> None
     trade_item.click_input()
     time.sleep(1.5)
 
+    # Defense in depth against the same class of bug: confirm the
+    # dialog that opened is actually addressed to the intended buddy
+    # before doing anything that sends a real trade request.
+    prompt_text = None
+    for element in window.descendants():
+        try:
+            text = element.window_text()
+        except Exception:
+            continue
+        if text.strip().startswith("Select trade binder to present to"):
+            prompt_text = text.strip()
+            break
+    if prompt_text is None:
+        raise MtgoAutomationError(
+            "Trade Request dialog did not open as expected"
+        )
+    if buddy_name not in prompt_text:
+        raise MtgoAutomationError(
+            f"Trade Request dialog is addressed to the wrong recipient: "
+            f"{prompt_text!r} (expected {buddy_name!r})"
+        )
+
     radio = None
     ok_btn = None
     for element in window.descendants():
