@@ -40,13 +40,34 @@ class MtgoAutomationError(RuntimeError):
     """Raised when an expected MTGO UI element or state can't be found."""
 
 
-def find_mtgo_window():
+def find_mtgo_window(account: str | None = None):
+    """Find the MTGO main window. With two instances open (e.g. a bot
+    account and a test-player account logged in side by side), both
+    windows share the exact same title — pass `account` to disambiguate
+    by the logged-in username, which shows up as a plain `Static` text
+    element matching the account name exactly. With `account=None`,
+    returns the first MTGO window found, same as before."""
+    candidates = []
     for window in Desktop(backend="uia").windows():
         try:
             if window.window_text().strip().lower() == "magic: the gathering online":
-                return window
+                candidates.append(window)
         except Exception:
             continue
+
+    if account is None:
+        return candidates[0] if candidates else None
+
+    for window in candidates:
+        for element in window.descendants():
+            try:
+                text = element.window_text()
+                control = element.friendly_class_name()
+            except Exception:
+                continue
+            if control == "Static" and text.strip() == account:
+                return window
+
     return None
 
 
