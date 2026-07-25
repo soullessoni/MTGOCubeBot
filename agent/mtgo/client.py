@@ -313,11 +313,69 @@ def create_binder_from_cards(window, binder_name: str, card_names: list[str]) ->
     return _read_deck_total_label(window)
 
 
+def is_buddy(window, username: str) -> bool:
+    return find_by_automation_id(window, f"MyBuddy-{username}") is not None
+
+
+def ensure_buddy(window, username: str) -> None:
+    """Add `username` to the buddy list if they aren't on it already.
+    Validated round-trip (remove/re-add) on 2026-07-25: `AddBuddyButton`
+    opens an "Add Buddy" dialog with an `Entry` text field and an
+    `Entrybutton` ("Add Buddy") to submit it."""
+    if is_buddy(window, username):
+        return
+
+    add_btn = find_by_automation_id(window, "AddBuddyButton")
+    if add_btn is None:
+        raise MtgoAutomationError("AddBuddyButton not found")
+    add_btn.click_input()
+    time.sleep(1.5)
+
+    entry = None
+    entry_btn = None
+    for element in window.descendants():
+        try:
+            control = element.friendly_class_name()
+            aid = element.element_info.automation_id
+        except Exception:
+            continue
+        if aid == "Entry" and control == "Edit":
+            entry = element
+        if aid == "Entrybutton":
+            entry_btn = element
+
+    if entry is None or entry_btn is None:
+        raise MtgoAutomationError("Add Buddy dialog fields not found")
+
+    entry.set_focus()
+    entry.type_keys(username, with_spaces=True)
+    time.sleep(0.5)
+    entry_btn.click_input()
+    time.sleep(1.5)
+
+    if not is_buddy(window, username):
+        raise MtgoAutomationError(f"buddy {username!r} was not added")
+
+
 def request_trade_with_binder(window, buddy_name: str, binder_name: str) -> None:
-    """Right-click the given buddy, select "Trade", and pick the named
-    binder in the resulting "Trade Request" dialog before sending. The
-    right-click + menu-item click must happen in the same call — MTGO's
-    context menu is transient and won't survive a separate invocation."""
+    """Ensure `buddy_name` is on the buddy list, then right-click them
+    and select "Trade", picking the named binder in the resulting
+    "Trade Request" dialog before sending. The right-click + menu-item
+    click must happen in the same call — MTGO's context menu is
+    transient and won't survive a separate invocation.
+
+    The buddy element is named `Buddies-<name>` under the Trade tab's
+    buddy panel — a different automation_id than the `MyBuddy-<name>`
+    widget `ensure_buddy`/`is_buddy` use on the Home screen — so this
+    switches to the Trade tab first.
+    """
+    ensure_buddy(window, buddy_name)
+
+    trade_tab = find_by_automation_id(window, "TradeButton")
+    if trade_tab is not None:
+        trade_tab.click_input()
+        time.sleep(1.5)
+
     buddy = find_by_automation_id(window, f"Buddies-{buddy_name}")
     if buddy is None:
         raise MtgoAutomationError(f"buddy element 'Buddies-{buddy_name}' not found")
@@ -404,6 +462,51 @@ def add_card_from_partner_binder(trade_window, card_name: str, timeout: float = 
     target.double_click_input()
     time.sleep(0.5)
     return True
+
+
+def read_receiving_panel(trade_window, viewer_username: str) -> set[str]:
+    """Return the set of card names currently staged in `viewer_username`'s
+    "Will Receive" panel of an open trade window (their own username for
+    "You Will Receive", the counterparty's for "<Name> Will Receive").
+
+    This is what lets the loan workflow only advance the specific cards
+    a player actually picked, rather than assuming they took every card
+    that was offered — a player is never forced to take everything from
+    an exposed binder. Call this after the other side submits (or after
+    we submit, on the retrieval direction) and before confirming, to
+    reconcile against what was planned.
+
+    Scoped to the `<viewer_username>CollectionLayoutView` container
+    specifically (not the whole trade window) so it can't pick up
+    unrelated `Collection-CardStack-*` elements from the browse/search
+    pane above it.
+    """
+    container = None
+    for element in trade_window.descendants():
+        try:
+            aid = element.element_info.automation_id
+        except Exception:
+            continue
+        if aid == f"{viewer_username}CollectionLayoutView":
+            container = element
+            break
+
+    if container is None:
+        raise MtgoAutomationError(
+            f"'{viewer_username}CollectionLayoutView' panel not found in trade window"
+        )
+
+    names: set[str] = set()
+    prefix = "Collection-CardStack-"
+    for element in container.descendants():
+        try:
+            aid = element.element_info.automation_id or ""
+        except Exception:
+            continue
+        if aid.startswith(prefix):
+            names.add(aid[len(prefix):])
+
+    return names
 
 
 def submit_trade(trade_window) -> None:
