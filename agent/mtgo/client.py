@@ -40,13 +40,42 @@ class MtgoAutomationError(RuntimeError):
     """Raised when an expected MTGO UI element or state can't be found."""
 
 
+def _logged_in_account(window) -> str | None:
+    """The logged-in username is NOT reliably found by searching for a
+    Static matching the account name anywhere in the tree — a buddy's
+    name shows up the exact same way in the Buddies list, and one
+    account can easily be a false-positive match for another's window
+    (confirmed live: searching for "FruitDuChene" matched TheLegionCube's
+    own window, because FruitDuChene is on TheLegionCube's buddy list).
+    The only reliable spot is the plain Static that immediately follows
+    `ChangeAvatarMainNavButton` in the nav bar — that position is
+    specifically the "logged in as" label, never a buddy-list entry.
+    """
+    descendants = window.descendants()
+    for index, element in enumerate(descendants):
+        try:
+            aid = element.element_info.automation_id
+        except Exception:
+            continue
+        if aid != "ChangeAvatarMainNavButton":
+            continue
+        for candidate in descendants[index + 1:index + 4]:
+            try:
+                text = candidate.window_text()
+                control = candidate.friendly_class_name()
+            except Exception:
+                continue
+            if control == "Static" and text.strip():
+                return text.strip()
+    return None
+
+
 def find_mtgo_window(account: str | None = None):
     """Find the MTGO main window. With two instances open (e.g. a bot
     account and a test-player account logged in side by side), both
     windows share the exact same title — pass `account` to disambiguate
-    by the logged-in username, which shows up as a plain `Static` text
-    element matching the account name exactly. With `account=None`,
-    returns the first MTGO window found, same as before."""
+    by the logged-in username (see `_logged_in_account`). With
+    `account=None`, returns the first MTGO window found."""
     candidates = []
     for window in Desktop(backend="uia").windows():
         try:
@@ -59,14 +88,8 @@ def find_mtgo_window(account: str | None = None):
         return candidates[0] if candidates else None
 
     for window in candidates:
-        for element in window.descendants():
-            try:
-                text = element.window_text()
-                control = element.friendly_class_name()
-            except Exception:
-                continue
-            if control == "Static" and text.strip() == account:
-                return window
+        if _logged_in_account(window) == account:
+            return window
 
     return None
 
