@@ -342,7 +342,19 @@ def ensure_buddy(window, username: str) -> None:
     """Add `username` to the buddy list if they aren't on it already.
     Validated round-trip (remove/re-add) on 2026-07-25: `AddBuddyButton`
     opens an "Add Buddy" dialog with an `Entry` text field and an
-    `Entrybutton` ("Add Buddy") to submit it."""
+    `Entrybutton` ("Add Buddy") to submit it.
+
+    The buddy list widget (`AddBuddyButton`/`MyBuddy-<name>`) only
+    exists on some screens (Home, Trade) — not on Collection, where a
+    caller is likely to be right after populating a binder. Navigate
+    Home first so this works regardless of which screen the caller left
+    the window on.
+    """
+    home_btn = find_by_automation_id(window, "HomeButton")
+    if home_btn is not None:
+        home_btn.click_input()
+        time.sleep(1.5)
+
     if is_buddy(window, username):
         return
 
@@ -399,19 +411,45 @@ def request_trade_with_binder(window, buddy_name: str, binder_name: str) -> None
 
     buddy = find_by_automation_id(window, f"Buddies-{buddy_name}")
     if buddy is None:
+        # the Trade screen's "Buddies" panel section is collapsible and
+        # may not be expanded, in which case Buddies-<name> elements
+        # don't exist in the tree at all yet
+        for element in window.descendants():
+            try:
+                text = element.window_text()
+                control = element.friendly_class_name()
+            except Exception:
+                continue
+            if text.strip() == "Buddies" and control == "Custom":
+                element.click_input()
+                time.sleep(1.5)
+                break
+        buddy = find_by_automation_id(window, f"Buddies-{buddy_name}")
+
+    if buddy is None:
         raise MtgoAutomationError(f"buddy element 'Buddies-{buddy_name}' not found")
 
     buddy.right_click_input()
     time.sleep(1.5)
 
+    # Scope strictly to MenuItem controls and stop at the first match —
+    # the Trade screen's live trade-post board has its own unrelated
+    # "Trade" Buttons on every row, and a text-only match without a
+    # control-type filter can grab one of those instead of the actual
+    # context-menu item, sending a trade request to the wrong person
+    # entirely (confirmed live: this once opened a Trade Request dialog
+    # targeting a random public trade-bot's post instead of the intended
+    # buddy — caught and cancelled before it was sent).
     trade_item = None
     for element in window.descendants():
         try:
             text = element.window_text()
+            control = element.friendly_class_name()
         except Exception:
             continue
-        if text.strip() == "Trade":
+        if text.strip() == "Trade" and control == "MenuItem":
             trade_item = element
+            break
     if trade_item is None:
         raise MtgoAutomationError("'Trade' context menu item not found")
     trade_item.click_input()
