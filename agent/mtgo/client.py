@@ -614,6 +614,12 @@ def read_receiving_panel(trade_window, viewer_username: str) -> set[str]:
 
 
 def submit_trade(trade_window) -> None:
+    """Click Submit on this side of the trade. **Both participants must
+    call this, even a giver who added nothing to their own "You Will
+    Receive"** — confirmed live: `Confirm Trade` never appears until
+    every side has submitted, not just whoever added cards. Uses
+    `invoke()` rather than a synthetic `click_input()`, since the latter
+    was observed to sometimes not register on this specific button."""
     for element in trade_window.descendants():
         try:
             text = element.window_text()
@@ -621,8 +627,8 @@ def submit_trade(trade_window) -> None:
         except Exception:
             continue
         if text.strip() == "Submit" and control == "Button":
-            element.click_input()
-            time.sleep(1.0)
+            element.invoke()
+            time.sleep(1.5)
             return
     raise MtgoAutomationError("Submit button not found in trade window")
 
@@ -650,10 +656,70 @@ def confirm_trade(trade_window) -> None:
         except Exception:
             continue
         if text.strip() == "Confirm Trade" and control == "Button":
-            element.click_input()
+            element.invoke()
             time.sleep(1.5)
             return
     raise MtgoAutomationError("Confirm Trade button not found in trade window")
+
+
+def accept_incoming_trade_request(
+        window,
+        sender_name: str,
+        binder_name: str = "Full Trade List",
+        timeout: float = 60.0,
+) -> None:
+    """Accept a trade request sent by `sender_name`, exposing
+    `binder_name` on this side. The receiving side's "Trade Request"
+    dialog looks like the sender's (same `OkButton`/`CancelButton`
+    automation_ids and binder RadioButton list) but reads "<sender> has
+    sent you a trade request..." and its buttons are labeled "Accept" /
+    "Reject" / "Block" rather than "OK" / "Cancel". Waits up to
+    `timeout` seconds for the dialog to appear."""
+    deadline = time.monotonic() + timeout
+    dialog_text = None
+    while time.monotonic() < deadline:
+        for element in window.descendants():
+            try:
+                text = element.window_text()
+            except Exception:
+                continue
+            if text.startswith(f"{sender_name} has sent you a trade request"):
+                dialog_text = text
+                break
+        if dialog_text is not None:
+            break
+        time.sleep(1.0)
+
+    if dialog_text is None:
+        raise MtgoAutomationError(
+            f"no incoming trade request from {sender_name!r} appeared"
+        )
+
+    radio = None
+    accept_btn = None
+    for element in window.descendants():
+        try:
+            text = element.window_text()
+            control = element.friendly_class_name()
+            aid = element.element_info.automation_id
+        except Exception:
+            continue
+        if aid == binder_name and control == "RadioButton":
+            radio = element
+        if text.strip() == "Accept" and control == "Button" and aid == "OkButton":
+            accept_btn = element
+
+    if radio is None:
+        raise MtgoAutomationError(
+            f"binder {binder_name!r} not offered in incoming Trade Request dialog"
+        )
+    radio.click_input()
+    time.sleep(0.5)
+
+    if accept_btn is None:
+        raise MtgoAutomationError("Accept button not found on incoming Trade Request dialog")
+    accept_btn.invoke()
+    time.sleep(1.5)
 
 
 def dismiss_added_to_collection_popup(window, timeout: float = 5.0) -> bool:
