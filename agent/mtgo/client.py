@@ -286,13 +286,54 @@ def export_full_trade_list(window, save_path: Path, timeout: float = 15.0) -> Pa
     if file_dialog is None:
         raise MtgoAutomationError("'Export Deck' file dialog not found")
 
+    save_path = save_path.resolve()
     save_path.parent.mkdir(parents=True, exist_ok=True)
-    edit = _find_visible_edit(file_dialog)
+
+    # This dialog has TWO Edit controls (a "search this folder" box near
+    # the top, and the real filename field near the bottom) —
+    # `_find_visible_edit`'s "first visible Edit" heuristic picks
+    # whichever appears first in traversal order, which was confirmed
+    # live 2026-07-26 to be the search box, silently leaving the
+    # filename field untouched with a stale value from a previous
+    # attempt. Target the one in the bottom half of the dialog instead.
+    dialog_rect = file_dialog.rectangle()
+    edit = None
+    for element in file_dialog.descendants():
+        try:
+            control = element.friendly_class_name()
+            visible = element.is_visible()
+            rect = element.rectangle()
+        except Exception:
+            continue
+        if control == "Edit" and visible and (rect.top - dialog_rect.top) / dialog_rect.height() > 0.5:
+            edit = element
+            break
+    if edit is None:
+        raise MtgoAutomationError("filename field not found in Export Deck dialog")
+
     edit.set_focus()
     edit.set_edit_text(str(save_path))
     time.sleep(0.3)
     edit.type_keys("{ENTER}")
     time.sleep(1.5)
+
+    # Confirm overwrite if the file already exists from a previous export.
+    for w in Desktop(backend="win32").windows():
+        try:
+            if w.window_text() != "Export Deck":
+                continue
+        except Exception:
+            continue
+        for element in w.descendants():
+            try:
+                text = element.window_text()
+                control = element.friendly_class_name()
+            except Exception:
+                continue
+            if control == "Button" and text.strip() == "&Oui":
+                element.click()
+                time.sleep(1.0)
+                break
 
     return save_path
 
@@ -802,6 +843,125 @@ def add_all_cards_from_partner_binder(
             continue
 
     return added
+
+
+def open_search_tools_dialog(trade_window, retries: int = 3) -> bool:
+    """Click the trade window's "Search Tools" button and confirm the
+    real "compare against partner's trade binder" popup opened (has an
+    `Import Deck` button) — not the visually-similar Cards filter
+    sidebar, which is ALSO internally labeled "Search Tools" and can be
+    what a `text.strip() == "Search Tools"` match lands on if the first
+    click doesn't register cleanly. Confirmed live 2026-07-26: a single
+    unverified click sometimes leaves the filter sidebar open instead
+    of the popup, silently breaking any caller that assumes the popup
+    is there. Retries with Escape + re-click in between."""
+    trade_window.set_focus()
+    for _ in range(retries):
+        search_tools_btn = None
+        for element in trade_window.descendants():
+            try:
+                text = element.window_text()
+                control = element.friendly_class_name()
+            except Exception:
+                continue
+            if control == "Button" and text.strip() == "Search Tools":
+                search_tools_btn = element
+                break
+        if search_tools_btn is None:
+            raise MtgoAutomationError("'Search Tools' button not found in trade window")
+
+        search_tools_btn.click_input()
+        time.sleep(1.5)
+
+        for element in trade_window.descendants():
+            try:
+                text = element.window_text()
+                control = element.friendly_class_name()
+            except Exception:
+                continue
+            if control == "Button" and text.strip() == "Import Deck":
+                return True
+
+        trade_window.type_keys("{ESC}")
+        time.sleep(0.5)
+
+    return False
+
+
+def import_deck_for_comparison(trade_window, dek_path: Path, timeout: float = 15.0) -> bool:
+    """Open Search Tools (via `open_search_tools_dialog`), Import Deck
+    `dek_path`, and dismiss any "cards not found" Warning. Returns
+    False if that warning appeared (meaning some names in `dek_path`
+    didn't resolve — expected to be rare/never with a CatID-correct
+    file, see `catid_map.py`), True otherwise.
+
+    This only narrows the exposed binder's browse pane to matching
+    names — it does NOT guarantee the shown items are the exact
+    edition being sought (confirmed live: a filtered "Tishana's
+    Tidebinder" showed a different CatID than the one being compared
+    against). Always follow this with an exact-CatID pick (e.g.
+    `add_all_cards_from_partner_binder(..., catid_map=...)`), never
+    treat "it's in the filtered view" as sufficient on its own.
+    """
+    if not open_search_tools_dialog(trade_window):
+        raise MtgoAutomationError("Search Tools popup (with Import Deck) did not open")
+
+    import_btn = None
+    for element in trade_window.descendants():
+        try:
+            text = element.window_text()
+            control = element.friendly_class_name()
+        except Exception:
+            continue
+        if control == "Button" and text.strip() == "Import Deck":
+            import_btn = element
+            break
+    if import_btn is None:
+        raise MtgoAutomationError("Import Deck button not found")
+    import_btn.click_input()
+    time.sleep(1.5)
+
+    file_dialog = None
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for w in Desktop(backend="win32").windows():
+            try:
+                if w.window_text() == "Select Deck(s)":
+                    file_dialog = w
+                    break
+            except Exception:
+                continue
+        if file_dialog is not None:
+            break
+        time.sleep(0.5)
+    if file_dialog is None:
+        raise MtgoAutomationError("'Select Deck(s)' file dialog not found")
+
+    edit = _find_visible_edit(file_dialog)
+    edit.set_focus()
+    edit.set_edit_text(str(dek_path))
+    time.sleep(0.3)
+    edit.type_keys("{ENTER}")
+    time.sleep(2.0)
+
+    for element in trade_window.descendants():
+        try:
+            text = element.window_text()
+            control = element.friendly_class_name()
+        except Exception:
+            continue
+        if control == "Dialog" and text == "Warning":
+            for sub in element.descendants():
+                try:
+                    sub_text = sub.window_text()
+                    sub_control = sub.friendly_class_name()
+                except Exception:
+                    continue
+                if sub_control == "Button" and sub_text.strip() == "OK":
+                    sub.invoke()
+                    time.sleep(1.0)
+                    return False
+    return True
 
 
 def read_receiving_panel(trade_window, viewer_username: str) -> set[str]:
