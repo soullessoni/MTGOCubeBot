@@ -24,6 +24,7 @@ load_dotenv()
 LISTS_DIR = Path(__file__).parent / "lists"
 
 BINDER_ROW_TEXT = "WotC.MtGO.Client.Model.Core.Collection.Binder"
+MEGABINDER_ROW_TEXT = "WotC.MtGO.Client.Model.Core.Collection.MegaBinder"
 
 MTGO_APPREF_PATH = (
     Path(os.environ["APPDATA"])
@@ -154,6 +155,7 @@ def open_binder(window, binder_name: str, timeout: float = 15.0) -> bool:
     not become the add/import target). Binder rows carry no
     automation_id and share the same window_text(), so this is the only
     reliable way to target one by name."""
+    window.set_focus()
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         rows = _binder_rows(window)
@@ -225,9 +227,91 @@ def delete_binder(window, binder_name: str) -> bool:
     return False
 
 
-def _write_dek_file(binder_name: str, card_names: list[str]) -> Path:
+def export_full_trade_list(window, save_path: Path, timeout: float = 15.0) -> Path:
+    """Export the account's "Full Trade List" (its entire real
+    collection, quantities and CatIDs included) to a .dek file at
+    `save_path` — the ground truth for post-trade stock verification
+    (see `stock_check.py`).
+
+    **Right-click gotcha confirmed live 2026-07-26**: the "Full Trade
+    List" row's `right_click_input()` only opens its context menu
+    reliably when called on the tree-view element (`window_text() ==
+    MEGABINDER_ROW_TEXT`) directly — right-clicking via raw screen
+    coordinates on the icon-gallery tile below (which visually also
+    shows an "Export" hover button) was unreliable in practice."""
+    window.set_focus()
+    target = None
+    for element in window.descendants():
+        try:
+            text = element.window_text()
+        except Exception:
+            continue
+        if text == MEGABINDER_ROW_TEXT:
+            target = element
+            break
+    if target is None:
+        raise MtgoAutomationError("'Full Trade List' row not found")
+
+    target.right_click_input()
+    time.sleep(1.0)
+
+    export_item = None
+    for element in window.descendants():
+        try:
+            text = element.window_text()
+            control = element.friendly_class_name()
+        except Exception:
+            continue
+        if control == "MenuItem" and text.strip() == "Export":
+            export_item = element
+            break
+    if export_item is None:
+        raise MtgoAutomationError("'Export' context menu item not found")
+    export_item.invoke()
+    time.sleep(1.5)
+
+    file_dialog = None
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for w in Desktop(backend="win32").windows():
+            try:
+                if w.window_text() == "Export Deck":
+                    file_dialog = w
+                    break
+            except Exception:
+                continue
+        if file_dialog is not None:
+            break
+        time.sleep(0.5)
+    if file_dialog is None:
+        raise MtgoAutomationError("'Export Deck' file dialog not found")
+
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    edit = _find_visible_edit(file_dialog)
+    edit.set_focus()
+    edit.set_edit_text(str(save_path))
+    time.sleep(0.3)
+    edit.type_keys("{ENTER}")
+    time.sleep(1.5)
+
+    return save_path
+
+
+def _write_dek_file(
+        binder_name: str,
+        card_names: list[str],
+        catid_map: dict[str, str] | None = None,
+) -> Path:
+    """Write a .dek file for import. `catid_map` (name -> CatID, e.g.
+    from `catid_map.load_default_catid_map()`) lets a card reference
+    the exact edition the account actually owns instead of `CatID="0"`,
+    which makes MTGO resolve by name alone and silently pick the most
+    recent printing — even if the account owns a different one (see
+    `catid_map.py` for the full story). Falls back to "0" for any name
+    not in the map."""
     LISTS_DIR.mkdir(parents=True, exist_ok=True)
     path = LISTS_DIR / f"{binder_name}.dek"
+    catid_map = catid_map or {}
 
     lines = [
         '<?xml version="1.0" encoding="utf-8"?>',
@@ -237,8 +321,9 @@ def _write_dek_file(binder_name: str, card_names: list[str]) -> Path:
         "  <PreconstructedDeckID>0</PreconstructedDeckID>",
     ]
     for name in card_names:
+        catid = catid_map.get(name, "0")
         lines.append(
-            f'  <Cards CatID="0" Quantity="1" Sideboard="false" '
+            f'  <Cards CatID="{catid}" Quantity="1" Sideboard="false" '
             f'Name="{escape(name)}" Annotation="0" />'
         )
     lines.append("</Deck>")
@@ -269,24 +354,37 @@ def _dialog_present(window, title: str) -> bool:
     return False
 
 
-def create_binder_from_cards(window, binder_name: str, card_names: list[str]) -> str:
+def create_binder_from_cards(
+        window,
+        binder_name: str,
+        card_names: list[str],
+        catid_map: dict[str, str] | None = None,
+) -> str:
     """Create (or replace) a binder populated with exactly `card_names`,
-    by importing a generated .dek file. Vastly faster and more reliable
-    than searching and double-clicking each card: MTGO resolves cards by
-    their `Name` attribute even with `CatID="0"`, so no card-ID database
-    is needed. Returns the final "<name>: <count>" label, or raises
-    MtgoAutomationError if any step fails.
+    by importing a generated .dek file. Returns the final
+    "<name>: <count>" label, or raises MtgoAutomationError if any step
+    fails.
+
+    **Pass `catid_map`** (name -> CatID, typically
+    `catid_map.load_default_catid_map()`) whenever you can — without it,
+    every card uses `CatID="0"` and MTGO resolves by name alone, which
+    silently picks the *most recent* printing of that name rather than
+    whatever edition the account actually owns. The binder then reports
+    the full requested count but only actually exposes cards that
+    happened to resolve to an owned edition (confirmed live 2026-07-25:
+    a 58-card CatID="0" import only offered 27 cards in a real trade).
 
     The binder-name field auto-fills correctly from the .dek filename
     (which is `binder_name` itself) — do NOT try to overwrite that field,
     doing so was found to leave the dialog in a broken state where the
     OK button silently does nothing.
     """
+    window.set_focus()
     if binder_exists(window, binder_name):
         delete_binder(window, binder_name)
         time.sleep(1.5)
 
-    dek_path = _write_dek_file(binder_name, card_names)
+    dek_path = _write_dek_file(binder_name, card_names, catid_map=catid_map)
 
     collection_btn = find_by_automation_id(window, "CollectionButton")
     if collection_btn is not None:
@@ -373,6 +471,7 @@ def ensure_buddy(window, username: str) -> None:
     Home first so this works regardless of which screen the caller left
     the window on.
     """
+    window.set_focus()
     home_btn = find_by_automation_id(window, "HomeButton")
     if home_btn is not None:
         home_btn.click_input()
@@ -444,6 +543,7 @@ def request_trade_with_binder(window, buddy_name: str, binder_name: str) -> None
     # from a just-finished trade can silently eat a HomeButton click and
     # break ensure_buddy() on the very next attempt (confirmed live,
     # repeatedly) — clear both defensively before doing anything else.
+    window.set_focus()
     dismiss_trade_completed_popup(window, timeout=3)
     dismiss_added_to_collection_popup(window, timeout=3)
 
@@ -549,24 +649,54 @@ def request_trade_with_binder(window, buddy_name: str, binder_name: str) -> None
     time.sleep(1.0)
 
 
-def add_card_from_partner_binder(trade_window, card_name: str, timeout: float = 8.0) -> bool:
+def add_card_from_partner_binder(
+        trade_window,
+        card_name: str,
+        catid: str | None = None,
+        timeout: float = 8.0,
+) -> bool:
     """Search the counterparty's exposed binder inside a trade window and
     add `card_name` to "You Will Receive". Targets the
     `<name>_<numericId>_CardQuantityControl` element rather than the
     `Collection-CardStack-<name>` image — the latter can carry a stale
     "ghost" automation peer for a previously searched card at the same
-    screen position, silently adding the wrong card."""
+    screen position, silently adding the wrong card.
+
+    **Pass `catid`** (e.g. from `catid_map.load_default_catid_map()`)
+    whenever the exact printing matters — matching by name alone can
+    grab the WRONG copy when the counterparty independently owns a
+    different printing of a same-named card. Confirmed live 2026-07-26:
+    retrieving "Tishana's Tidebinder" back from a player who also owned
+    an unrelated copy matched CatID 117678 (their own) instead of the
+    cube's own CatID 117962 — same name, wrong card, silently "succeeded".
+    With `catid` set, only the exact `<name>_<catid>_CardQuantityControl`
+    element counts as a match; if the search doesn't surface that exact
+    printing, this returns False rather than falling back to any
+    same-named card, so a caller can treat it as a real failure instead
+    of silently taking the wrong item.
+
+    **Critical gotcha confirmed live**: pressing `{ENTER}` in this search
+    box does NOT submit the search against a large exposed collection
+    (e.g. "Full Trade List") — the browse pane just silently keeps
+    showing whatever was already displayed (confirmed: searching
+    "Harmonized Trio" via Enter returned an unrelated leftover card,
+    "Tishana's Tidebinder"). Only clicking the actual `SearchButton`
+    (magnifying glass) reliably submits the query."""
     search_box = find_by_automation_id(trade_window, "searchTextBox")
     if search_box is None:
         raise MtgoAutomationError("searchTextBox not found in trade window")
+    search_btn = find_by_automation_id(trade_window, "SearchButton")
+    if search_btn is None:
+        raise MtgoAutomationError("SearchButton not found in trade window")
 
     search_box.set_focus()
     search_box.type_keys("^a{DELETE}")
     search_box.type_keys(card_name, with_spaces=True)
-    search_box.type_keys("{ENTER}")
+    search_btn.click_input()
 
-    prefix = f"{card_name}_"
     suffix = "_CardQuantityControl"
+    exact_aid = f"{card_name}_{catid}{suffix}" if catid is not None else None
+    prefix = f"{card_name}_"
     deadline = time.monotonic() + timeout
     target = None
     while time.monotonic() < deadline:
@@ -575,7 +705,11 @@ def add_card_from_partner_binder(trade_window, card_name: str, timeout: float = 
                 aid = element.element_info.automation_id or ""
             except Exception:
                 continue
-            if aid.startswith(prefix) and aid.endswith(suffix):
+            if exact_aid is not None:
+                if aid == exact_aid:
+                    target = element
+                    break
+            elif aid.startswith(prefix) and aid.endswith(suffix):
                 target = element
                 break
         if target is not None:
@@ -588,6 +722,86 @@ def add_card_from_partner_binder(trade_window, card_name: str, timeout: float = 
     target.double_click_input()
     time.sleep(0.5)
     return True
+
+
+def add_all_cards_from_partner_binder(
+        trade_window,
+        card_names: list[str],
+        catid_map: dict[str, str] | None = None,
+        timeout: float = 10.0,
+) -> list[str]:
+    """Add several cards from the counterparty's exposed binder in one
+    pass, without a separate search per card. Searching once per card
+    (as `add_card_from_partner_binder` does) doesn't scale — MTGO's own
+    search-result rendering is slow enough that N searches means N
+    multi-second waits — and is pointless when the exposed binder is
+    already small (e.g. a purpose-built `Session<id>-<player>` binder
+    containing exactly the target cards): the whole thing renders in one
+    pass without any search at all, so this clears the search box once
+    and reads every `<name>_<id>_CardQuantityControl` element already in
+    the tree, double-clicking each one whose name is in `card_names`.
+
+    **Pass `catid_map`** (name -> CatID) whenever the exact printing
+    matters — same reasoning as `add_card_from_partner_binder`: without
+    it, a name match can grab a DIFFERENT printing the counterparty
+    happens to own independently instead of the one actually being
+    retrieved. When a name has an entry in `catid_map`, only the exact
+    `<name>_<catid>_CardQuantityControl` element counts; names absent
+    from the map fall back to any same-named match.
+
+    Not suitable for narrowing down a large binder (e.g. "Full Trade
+    List" with a big collection behind it) where virtualization means
+    only the currently-scrolled-into-view cards actually exist as UI
+    Automation elements — for that case a caller should apply a filter
+    (e.g. the Wish List "Compare to wishlist" filter) before calling
+    this, or fall back to `add_card_from_partner_binder` per card.
+
+    Returns the list of card names actually found and double-clicked
+    (a subset of `card_names` if some aren't in the exposed binder).
+    """
+    search_box = find_by_automation_id(trade_window, "searchTextBox")
+    if search_box is not None:
+        search_box.set_focus()
+        search_box.type_keys("^a{DELETE}")
+        search_box.type_keys("{ENTER}")
+        time.sleep(1.0)
+
+    catid_map = catid_map or {}
+    wanted = set(card_names)
+    suffix = "_CardQuantityControl"
+    found: dict[str, object] = {}
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline and len(found) < len(wanted):
+        for element in trade_window.descendants():
+            try:
+                aid = element.element_info.automation_id or ""
+            except Exception:
+                continue
+            if not aid.endswith(suffix):
+                continue
+            body = aid[: -len(suffix)]
+            name = body.rsplit("_", 1)[0]
+            if name not in wanted or name in found:
+                continue
+            expected_catid = catid_map.get(name)
+            if expected_catid is not None:
+                catid = body.rsplit("_", 1)[1] if "_" in body else ""
+                if catid != expected_catid:
+                    continue
+            found[name] = element
+        if len(found) < len(wanted):
+            time.sleep(0.5)
+
+    added = []
+    for name, element in found.items():
+        try:
+            element.double_click_input()
+            time.sleep(0.3)
+            added.append(name)
+        except Exception:
+            continue
+
+    return added
 
 
 def read_receiving_panel(trade_window, viewer_username: str) -> set[str]:
@@ -697,6 +911,7 @@ def accept_incoming_trade_request(
     sent you a trade request..." and its buttons are labeled "Accept" /
     "Reject" / "Block" rather than "OK" / "Cancel". Waits up to
     `timeout` seconds for the dialog to appear."""
+    window.set_focus()
     deadline = time.monotonic() + timeout
     dialog_text = None
     while time.monotonic() < deadline:
@@ -790,7 +1005,7 @@ def dismiss_added_to_collection_popup(window, timeout: float = 5.0) -> bool:
             if control == "Button" and text.strip() == "Close":
                 rect = element.rectangle()
                 if element.is_visible() and rect.width() > 0 and rect.height() > 0:
-                    element.click_input()
+                    element.invoke()
                     time.sleep(1.0)
                     return True
         time.sleep(0.5)

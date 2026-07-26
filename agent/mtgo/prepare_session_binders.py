@@ -17,6 +17,7 @@ import sys
 import httpx
 from dotenv import load_dotenv
 
+from mtgo.catid_map import load_default_catid_map
 from mtgo.client import create_binder_from_cards, find_mtgo_window
 
 load_dotenv()
@@ -77,10 +78,19 @@ def main():
         print("MTGO window not found.")
         return 1
 
+    catid_map = load_default_catid_map()
+    if not catid_map:
+        print(
+            "  [WARN] no CatID map found — binders will use CatID=\"0\" "
+            "name-only resolution, which can silently expose the wrong "
+            "edition. Export the bot account's Full Trade List to "
+            "mtgo/lists/full_trade_list.dek to fix this."
+        )
+
     for mtgo_username, card_names in by_player.items():
         binder_name = f"Session{session_id}-{mtgo_username}"
         try:
-            label = create_binder_from_cards(window, binder_name, card_names)
+            label = create_binder_from_cards(window, binder_name, card_names, catid_map=catid_map)
             print(f"{mtgo_username}: {label} ({len(card_names)} cards)")
         except Exception as error:
             print(f"{mtgo_username}: FAILED — {error}")
