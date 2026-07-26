@@ -1,5 +1,6 @@
 from mtgo.stock_check import (
     compute_expected_quantities,
+    compute_return_reconciliation,
     diff_stock,
     parse_dek_quantities,
 )
@@ -85,3 +86,55 @@ def test_diff_stock_handles_card_present_in_actual_but_not_expected():
     actual = {"Bonus Card": 1}
 
     assert diff_stock(expected, actual) == {"missing": {}, "extra": {"Bonus Card": 1}}
+
+
+def test_compute_return_reconciliation_confirms_exact_match():
+    before = {"Mulldrifter": 0}
+    after = {"Mulldrifter": 1}
+
+    result = compute_return_reconciliation(before, after, ["Mulldrifter"])
+
+    assert result == {"to_give_back": {}, "still_owed": {}}
+
+
+def test_compute_return_reconciliation_flags_excess_received():
+    """The real 2026-07-26 incident: only 1 was owed, but 2 came back
+    because the counterparty independently owned an extra copy."""
+    before = {"Mulldrifter": 0}
+    after = {"Mulldrifter": 2}
+
+    result = compute_return_reconciliation(before, after, ["Mulldrifter"])
+
+    assert result == {"to_give_back": {"Mulldrifter": 1}, "still_owed": {}}
+
+
+def test_compute_return_reconciliation_flags_shortfall():
+    before = {"Scuttling Sentinel": 0}
+    after = {"Scuttling Sentinel": 0}
+
+    result = compute_return_reconciliation(before, after, ["Scuttling Sentinel"])
+
+    assert result == {"to_give_back": {}, "still_owed": {"Scuttling Sentinel": 1}}
+
+
+def test_compute_return_reconciliation_handles_multiple_copies_owed():
+    before = {"Snow-Covered Island": 0}
+    after = {"Snow-Covered Island": 1}
+
+    result = compute_return_reconciliation(
+        before, after, ["Snow-Covered Island", "Snow-Covered Island"]
+    )
+
+    assert result == {"to_give_back": {}, "still_owed": {"Snow-Covered Island": 1}}
+
+
+def test_compute_return_reconciliation_ignores_unrelated_baseline_changes():
+    # A card neither owed nor mentioned that happens to differ between
+    # exports (e.g. from an unrelated concurrent trade) shouldn't be
+    # flagged as a reconciliation issue for THIS return.
+    before = {"Mulldrifter": 0, "Unrelated Card": 3}
+    after = {"Mulldrifter": 1, "Unrelated Card": 3}
+
+    result = compute_return_reconciliation(before, after, ["Mulldrifter"])
+
+    assert result == {"to_give_back": {}, "still_owed": {}}

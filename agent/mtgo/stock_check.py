@@ -13,6 +13,7 @@ the collection. This module makes that check automatic and repeatable.
 
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -77,3 +78,44 @@ def diff_stock(
             extra[name] = actual_qty - expected_qty
 
     return {"missing": missing, "extra": extra}
+
+
+def compute_return_reconciliation(
+        before: dict[str, int],
+        after: dict[str, int],
+        expected_names: list[str],
+) -> dict[str, dict[str, int]]:
+    """Figure out what a return trade actually accomplished by diffing
+    two real "Full Trade List" exports (`before`/`after`, from
+    `parse_dek_quantities` on exports bracketing the trade) — not by
+    reading the live trade window, which was found unreliable for
+    quantity (Search Tools' Import Deck auto-add doesn't respect "only
+    1 copy needed"; it can grab however many the counterparty happens
+    to own). This sidesteps that entirely: whatever the real delta in
+    the account's own collection is, is the ground truth.
+
+    `expected_names` is one entry per card that should have come back
+    (matching `create_binder_from_cards`/loan-record conventions — a
+    name repeated N times means N copies were owed).
+
+    Returns `{"to_give_back": {name: excess}, "still_owed": {name: shortfall}}`
+    — `to_give_back` is for a follow-up GIVE trade (received too many),
+    `still_owed` is for a follow-up RETURN attempt (received too few).
+    Both are meant to be resolved with another decklist-driven trade,
+    never by editing the just-completed one.
+    """
+    expected = Counter(expected_names)
+    names = set(before) | set(after) | set(expected)
+
+    to_give_back: dict[str, int] = {}
+    still_owed: dict[str, int] = {}
+
+    for name in names:
+        received = after.get(name, 0) - before.get(name, 0)
+        needed = expected.get(name, 0)
+        if received > needed:
+            to_give_back[name] = received - needed
+        elif received < needed:
+            still_owed[name] = needed - received
+
+    return {"to_give_back": to_give_back, "still_owed": still_owed}
