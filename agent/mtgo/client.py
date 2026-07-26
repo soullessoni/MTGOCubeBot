@@ -888,20 +888,36 @@ def open_search_tools_dialog(trade_window, retries: int = 3) -> bool:
     return False
 
 
-def import_deck_for_comparison(trade_window, dek_path: Path, timeout: float = 15.0) -> bool:
+def import_deck_for_comparison(
+        trade_window,
+        dek_path: Path,
+        viewer_username: str | None = None,
+        settle_timeout: float = 20.0,
+        timeout: float = 15.0,
+) -> bool:
     """Open Search Tools (via `open_search_tools_dialog`), Import Deck
     `dek_path`, and dismiss any "cards not found" Warning. Returns
     False if that warning appeared (meaning some names in `dek_path`
     didn't resolve — expected to be rare/never with a CatID-correct
     file, see `catid_map.py`), True otherwise.
 
+    **Pass `viewer_username`** so this can wait for the auto-add to
+    actually finish before returning — confirmed live 2026-07-26 that
+    the "Will Receive" item count keeps climbing for several seconds
+    after import (a fixed short sleep caught as few as 12/40 cards; the
+    rest only appeared with more time), so reading state too early
+    makes the caller think most cards need the slow per-card fallback
+    when they'd have auto-added for free with a bit more patience.
+    Polls the item count until it stops growing for 1.5s or
+    `settle_timeout` elapses.
+
     This only narrows the exposed binder's browse pane to matching
     names — it does NOT guarantee the shown items are the exact
     edition being sought (confirmed live: a filtered "Tishana's
     Tidebinder" showed a different CatID than the one being compared
     against). Always follow this with an exact-CatID pick (e.g.
-    `add_all_cards_from_partner_binder(..., catid_map=...)`), never
-    treat "it's in the filtered view" as sufficient on its own.
+    `reconcile_receiving_panel`), never treat "it's in the filtered
+    view" as sufficient on its own.
     """
     if not open_search_tools_dialog(trade_window):
         raise MtgoAutomationError("Search Tools popup (with Import Deck) did not open")
@@ -961,7 +977,34 @@ def import_deck_for_comparison(trade_window, dek_path: Path, timeout: float = 15
                     sub.invoke()
                     time.sleep(1.0)
                     return False
+
+    if viewer_username is not None:
+        _wait_for_receiving_panel_to_settle(trade_window, viewer_username, settle_timeout)
+
     return True
+
+
+def _wait_for_receiving_panel_to_settle(
+        trade_window,
+        viewer_username: str,
+        timeout: float,
+        stable_for: float = 1.5,
+        interval: float = 0.5,
+) -> int:
+    """Poll `viewer_username`'s "Will Receive" item count until it stops
+    increasing for `stable_for` seconds. Returns the final count."""
+    last_count = -1
+    stable_since = time.monotonic()
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        count = len(read_receiving_panel_catids(trade_window, viewer_username))
+        if count != last_count:
+            last_count = count
+            stable_since = time.monotonic()
+        elif time.monotonic() - stable_since >= stable_for:
+            return count
+        time.sleep(interval)
+    return last_count
 
 
 def read_receiving_panel(trade_window, viewer_username: str) -> set[str]:
@@ -1007,6 +1050,135 @@ def read_receiving_panel(trade_window, viewer_username: str) -> set[str]:
             names.add(aid[len(prefix):])
 
     return names
+
+
+def _receiving_panel_container(trade_window, viewer_username: str):
+    for element in trade_window.descendants():
+        try:
+            aid = element.element_info.automation_id
+        except Exception:
+            continue
+        if aid == f"{viewer_username}CollectionLayoutView":
+            return element
+    return None
+
+
+def read_receiving_panel_catids(trade_window, viewer_username: str) -> dict[str, str]:
+    """Like `read_receiving_panel`, but returns `{name: catid}` instead
+    of just names — the CatID is what actually distinguishes "the
+    printing that was lent" from "a different printing of the same
+    name the counterparty happens to own", which a bare name can't
+    (see `trade_reconciliation.py` for why this matters)."""
+    container = _receiving_panel_container(trade_window, viewer_username)
+    if container is None:
+        raise MtgoAutomationError(
+            f"'{viewer_username}CollectionLayoutView' panel not found in trade window"
+        )
+
+    suffix = "_CardQuantityControl"
+    catids: dict[str, str] = {}
+    for element in container.descendants():
+        try:
+            aid = element.element_info.automation_id or ""
+        except Exception:
+            continue
+        if not aid.endswith(suffix):
+            continue
+        body = aid[: -len(suffix)]
+        if "_" not in body:
+            continue
+        name, catid = body.rsplit("_", 1)
+        catids[name] = catid
+
+    return catids
+
+
+def remove_card_from_receiving_panel(
+        trade_window,
+        viewer_username: str,
+        card_name: str,
+        catid: str,
+        timeout: float = 8.0,
+) -> bool:
+    """Right-click the exact `<card_name>_<catid>_CardQuantityControl`
+    element in `viewer_username`'s "Will Receive" panel and click
+    "Remove All Copies from Trade" — used to undo a wrong-edition item
+    that Search Tools' Import Deck auto-add staged (it matches by name
+    only). Returns False if that exact printing isn't currently staged."""
+    container = _receiving_panel_container(trade_window, viewer_username)
+    if container is None:
+        raise MtgoAutomationError(
+            f"'{viewer_username}CollectionLayoutView' panel not found in trade window"
+        )
+
+    target_aid = f"{card_name}_{catid}_CardQuantityControl"
+    target = None
+    for element in container.descendants():
+        try:
+            aid = element.element_info.automation_id or ""
+        except Exception:
+            continue
+        if aid == target_aid:
+            target = element
+            break
+    if target is None:
+        return False
+
+    target.right_click_input()
+    time.sleep(1.0)
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for element in trade_window.descendants():
+            try:
+                text = element.window_text()
+                control = element.friendly_class_name()
+            except Exception:
+                continue
+            if control == "MenuItem" and text.strip() == "Remove All Copies from Trade":
+                element.invoke()
+                time.sleep(1.0)
+                return True
+        time.sleep(0.25)
+
+    return False
+
+
+def reconcile_receiving_panel(
+        trade_window,
+        viewer_username: str,
+        card_names: list[str],
+        catid_map: dict[str, str],
+        timeout: float = 15.0,
+) -> dict[str, list]:
+    """The fast-and-correct pairing for Search Tools' bulk auto-add:
+    read what's actually staged (by exact CatID), remove anything
+    staged under the wrong printing, and add whatever's missing or was
+    just removed — using `add_card_from_partner_binder`'s exact-CatID
+    matching so the replacement is guaranteed right. Never blindly adds
+    on top of what Import Deck already staged (that's what caused 5
+    duplicate cards live 2026-07-26).
+
+    Returns the `plan_reconciliation` dict, plus `"still_missing"` for
+    any name that couldn't be found/added even after this pass.
+    """
+    from mtgo.trade_reconciliation import plan_reconciliation
+
+    expected = {name: catid_map[name] for name in card_names if name in catid_map}
+    actual = read_receiving_panel_catids(trade_window, viewer_username)
+    plan = plan_reconciliation(expected, actual)
+
+    for name, wrong_catid in plan["to_remove"]:
+        remove_card_from_receiving_panel(trade_window, viewer_username, name, wrong_catid)
+
+    still_missing = []
+    for name in plan["to_add"]:
+        ok = add_card_from_partner_binder(trade_window, name, catid=catid_map.get(name), timeout=timeout)
+        if not ok:
+            still_missing.append(name)
+
+    plan["still_missing"] = still_missing
+    return plan
 
 
 def submit_trade(trade_window) -> None:
