@@ -31,6 +31,7 @@ person.
 
 import os
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -119,9 +120,11 @@ def main():
     dismiss_trade_completed_popup(bot_window, timeout=3)
     dismiss_added_to_collection_popup(bot_window, timeout=3)
 
+    bot_window.set_focus()
     coll = find_by_automation_id(bot_window, "CollectionButton")
     if coll:
         coll.click_input()
+        time.sleep(2.0)
     before_path = export_full_trade_list(bot_window, Path("mtgo/lists/_return_before.dek"))
     before_qty = parse_dek_quantities(before_path)
 
@@ -163,9 +166,11 @@ def main():
     dismiss_added_to_collection_popup(bot_window, timeout=8)
     dismiss_trade_completed_popup(bot_window, timeout=5)
 
+    bot_window.set_focus()
     coll = find_by_automation_id(bot_window, "CollectionButton")
     if coll:
         coll.click_input()
+        time.sleep(2.0)
     after_path = export_full_trade_list(bot_window, Path("mtgo/lists/_return_after.dek"))
     after_qty = parse_dek_quantities(after_path)
 

@@ -253,7 +253,7 @@ def export_full_trade_list(window, save_path: Path, timeout: float = 15.0) -> Pa
         raise MtgoAutomationError("'Full Trade List' row not found")
 
     target.right_click_input()
-    time.sleep(1.0)
+    time.sleep(2.5)
 
     export_item = None
     for element in window.descendants():
