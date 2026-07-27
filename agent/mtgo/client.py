@@ -296,18 +296,30 @@ def export_full_trade_list(window, save_path: Path, timeout: float = 15.0) -> Pa
     # live 2026-07-26 to be the search box, silently leaving the
     # filename field untouched with a stale value from a previous
     # attempt. Target the one in the bottom half of the dialog instead.
+    # The dialog's top-level window can exist for a moment before its
+    # child controls (the filename field included) are actually attached
+    # — confirmed live 2026-07-27: a one-shot descendants() walk right
+    # after finding the dialog missed the field even though it was
+    # visibly there a fraction of a second later. Poll instead, matching
+    # every other "wait for a dialog's contents to settle" spot in this
+    # module.
     dialog_rect = file_dialog.rectangle()
     edit = None
-    for element in file_dialog.descendants():
-        try:
-            control = element.friendly_class_name()
-            visible = element.is_visible()
-            rect = element.rectangle()
-        except Exception:
-            continue
-        if control == "Edit" and visible and (rect.top - dialog_rect.top) / dialog_rect.height() > 0.5:
-            edit = element
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        for element in file_dialog.descendants():
+            try:
+                control = element.friendly_class_name()
+                visible = element.is_visible()
+                rect = element.rectangle()
+            except Exception:
+                continue
+            if control == "Edit" and visible and (rect.top - dialog_rect.top) / dialog_rect.height() > 0.5:
+                edit = element
+                break
+        if edit is not None:
             break
+        time.sleep(0.3)
     if edit is None:
         raise MtgoAutomationError("filename field not found in Export Deck dialog")
 
