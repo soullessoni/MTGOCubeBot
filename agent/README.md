@@ -65,9 +65,10 @@ testée unitairement, sans dépendre de Discord :
 .venv/Scripts/python -m pytest
 ```
 
-Le reste (`bot/cogs/session_flow.py`, `bot/main.py`) nécessite une vraie
-connexion Discord pour être validé — pas encore testé en conditions
-réelles.
+Le reste (`bot/cogs/session_flow.py`, `bot/cogs/mtgo_admin.py`,
+`bot/main.py`) nécessite une vraie connexion Discord pour être validé —
+non couvert par la suite automatisée, mais testé en conditions réelles
+(vrai serveur Discord, vrai client MTGO) au fil du développement.
 
 ## Robustesse au redémarrage
 

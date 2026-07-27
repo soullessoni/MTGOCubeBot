@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import httpx
 import pytest
 
@@ -19,12 +17,5 @@ def test_download_mtgo_export():
     response = httpx.get(url)
 
     response.raise_for_status()
-
-    Path(
-        "cubecobra_mtgo_export.txt"
-    ).write_text(
-        response.text,
-        encoding="utf-8",
-    )
 
     assert response.text

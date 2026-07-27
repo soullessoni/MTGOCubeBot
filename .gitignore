@@ -30,3 +30,8 @@ agent/mtgo/lists/
 
 # Local database backups
 backend/backups/
+
+# Debug dumps written by live-network integration tests
+# (test_cubecobra_import.py / test_cubecobra_export.py)
+backend/cubecobra_debug.html
+backend/cubecobra_mtgo_export.txt

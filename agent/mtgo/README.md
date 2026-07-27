@@ -65,9 +65,17 @@ individually is 10x+ slower and meaningfully unreliable at MTGO's own
 search-rendering speed. See `import_binder.py` and the memory write-up
 for the full dialog-automation details.
 
-## Not yet built
-A real `agent/mtgo/client.py`-style module wrapping this into reusable,
-tested functions (create_or_get_binder, add_card_to_binder,
-request_trade_with_binder, wait_for_trade_window,
-confirm_and_submit, ...) driven by the loan session state machine. The
-scripts here are the reconnaissance that module will be built from.
+## Where this led
+
+`client.py` is the real, production module built from this
+reconnaissance — `create_binder_from_cards`, `request_trade_with_binder`,
+`wait_for_trade_window`, `submit_trade`, `confirm_trade`, and friends,
+used by `prepare_session_binders.py` (give) and
+`process_session_returns.py` (return). Those two scripts are the actual
+admin-triggered flows; the scripts in this file are kept only as
+reference for how their mechanics were originally derived.
+
+`full_cycle_test_v2.py` / `v3.py` / `v4.py` and
+`full_session_test_cycle.py` are later, higher-level one-off validation
+scripts (see their own docstrings) — not part of the production flow
+either, kept for the same reason.
