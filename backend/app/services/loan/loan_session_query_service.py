@@ -1,3 +1,6 @@
+from sqlalchemy.orm import selectinload
+
+from app.models.loan_assignment import LoanAssignment
 from app.models.loan_session import LoanSession
 
 
@@ -12,6 +15,9 @@ class LoanSessionQueryService:
     ) -> LoanSession | None:
         return (
             self.db.query(LoanSession)
+            .options(
+                selectinload(LoanSession.assignments).selectinload(LoanAssignment.card)
+            )
             .filter(
                 LoanSession.id == session_id
             )
@@ -21,6 +27,9 @@ class LoanSessionQueryService:
     def list_all(self) -> list[LoanSession]:
         return (
             self.db.query(LoanSession)
+            .options(
+                selectinload(LoanSession.assignments).selectinload(LoanAssignment.card)
+            )
             .order_by(
                 LoanSession.created_at.desc()
             )

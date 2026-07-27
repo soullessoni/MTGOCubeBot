@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import event
 
 from app.models.card import Card
 from app.models.loan_assignment import LoanAssignment
@@ -407,6 +408,48 @@ def test_force_cancel_cancels_session_and_active_assignments(db_session):
     assert session.status == "CANCELLED"
     assert prepared_assignment.status == "CANCELLED"
     assert returned_assignment.status == "RETURNED"
+
+
+def test_force_cancel_commits_once_regardless_of_assignment_count(db_session):
+    session = LoanSession(
+        status="IN_PROGRESS",
+    )
+
+    card = Card(
+        name="Black Lotus",
+    )
+
+    for i in range(10):
+        session.assignments.append(
+            LoanAssignment(
+                card=card,
+                status="PREPARED",
+                player_name=f"Player {i}",
+                quantity=1,
+            )
+        )
+
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanSessionWorkflowService(
+        db_session,
+    )
+
+    commit_count = 0
+
+    def _count_commit(session_):
+        nonlocal commit_count
+        commit_count += 1
+
+    event.listen(db_session, "after_commit", _count_commit)
+    try:
+        service.force_cancel(session)
+    finally:
+        event.remove(db_session, "after_commit", _count_commit)
+
+    assert commit_count == 1
+    assert all(assignment.status == "CANCELLED" for assignment in session.assignments)
 
 
 def test_cannot_force_cancel_completed_session(db_session):

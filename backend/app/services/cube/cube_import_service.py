@@ -35,15 +35,14 @@ class CubeImportService:
         self.db.add(cube)
         self.db.flush()
 
+        existing_cards = {
+            existing.name: existing
+            for existing in self.db.query(Card).all()
+        }
+
         for entry in cards:
 
-            card = (
-                self.db.query(Card)
-                .filter(
-                    Card.name == entry.name
-                )
-                .first()
-            )
+            card = existing_cards.get(entry.name)
 
             if not card:
                 card = Card(
@@ -52,6 +51,7 @@ class CubeImportService:
 
                 self.db.add(card)
                 self.db.flush()
+                existing_cards[entry.name] = card
 
             cube_card = CubeCard(
                 cube_id=cube.id,

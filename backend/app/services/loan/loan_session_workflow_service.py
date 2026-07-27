@@ -131,7 +131,7 @@ class LoanSessionWorkflowService:
         )
 
         for assignment in session.assignments:
-            self.assignment_service.force_cancel(
+            self.assignment_service.status_service.force_cancel(
                 assignment,
             )
 

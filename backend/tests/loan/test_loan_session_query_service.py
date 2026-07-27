@@ -1,3 +1,5 @@
+from sqlalchemy import event
+
 from app.models.card import Card
 from app.models.loan_assignment import LoanAssignment
 from app.models.loan_session import LoanSession
@@ -93,3 +95,56 @@ def test_list_all_sessions_when_empty(db_session):
     result = service.list_all()
 
     assert result == []
+
+
+def test_list_all_does_not_query_card_names_one_by_one(db_session):
+    card_a = Card(name="Black Lotus")
+    card_b = Card(name="Ancestral Recall")
+    session = LoanSession(status="CREATED")
+
+    db_session.add_all([card_a, card_b, session])
+    db_session.commit()
+
+    db_session.add_all([
+        LoanAssignment(
+            session_id=session.id,
+            card_id=card_a.id,
+            player_name="Alice",
+            quantity=1,
+            status="CREATED",
+        ),
+        LoanAssignment(
+            session_id=session.id,
+            card_id=card_b.id,
+            player_name="Bob",
+            quantity=1,
+            status="CREATED",
+        ),
+    ])
+    db_session.commit()
+    db_session.expire_all()
+
+    service = LoanSessionQueryService(db_session)
+
+    engine = db_session.get_bind()
+    query_count = 0
+
+    def _count_query(*args, **kwargs):
+        nonlocal query_count
+        query_count += 1
+
+    event.listen(engine, "before_cursor_execute", _count_query)
+    try:
+        result = service.list_all()
+        names = [
+            assignment.card_name
+            for loan_session in result
+            for assignment in loan_session.assignments
+        ]
+    finally:
+        event.remove(engine, "before_cursor_execute", _count_query)
+
+    assert sorted(names) == ["Ancestral Recall", "Black Lotus"]
+    # One query for sessions, one for assignments, one for cards — NOT
+    # one extra query per assignment.
+    assert query_count <= 3
