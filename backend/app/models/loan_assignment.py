@@ -19,12 +19,14 @@ class LoanAssignment(Base):
         Integer,
         ForeignKey("loan_sessions.id"),
         nullable=False,
+        index=True,
     )
 
     card_id = Column(
         Integer,
         ForeignKey("cards.id"),
         nullable=False,
+        index=True,
     )
 
     card = relationship(
@@ -47,6 +49,7 @@ class LoanAssignment(Base):
         String(50),
         nullable=False,
         default="CREATED",
+        index=True,
     )
 
     created_at = Column(

@@ -18,18 +18,21 @@ class MtgoJob(Base):
     job_type = Column(
         String(50),
         nullable=False,
+        index=True,
     )
 
     status = Column(
         String(20),
         nullable=False,
         default="PENDING",
+        index=True,
     )
 
     session_id = Column(
         Integer,
         ForeignKey("loan_sessions.id"),
         nullable=True,
+        index=True,
     )
 
     mtgo_username = Column(

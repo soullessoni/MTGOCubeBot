@@ -17,6 +17,7 @@ class Card(Base):
     name: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
+        index=True,
     )
 
     mtgo_name: Mapped[str | None] = mapped_column(
