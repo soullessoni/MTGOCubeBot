@@ -470,8 +470,7 @@ def create_binder_from_cards(
     time.sleep(1.2)
 
     for _ in range(3):
-        if not _dialog_present(window, "Add or Import Binder(s)"):
-            break
+        dialog_present = False
         ok_btn = None
         for element in window.descendants():
             try:
@@ -480,9 +479,16 @@ def create_binder_from_cards(
                 aid = element.element_info.automation_id
             except Exception:
                 continue
-            if text.strip() == "OK" and control == "Button" and aid == "OkButton":
+            if control == "Dialog" and text == "Add or Import Binder(s)":
+                dialog_present = True
+            elif text.strip() == "OK" and control == "Button" and aid == "OkButton":
                 ok_btn = element
+            if dialog_present and ok_btn is not None:
                 break
+
+        if not dialog_present:
+            break
+
         if ok_btn is None:
             raise MtgoAutomationError("OK button not found on Add/Import Binder dialog")
         ok_btn.click_input()
@@ -498,6 +504,15 @@ def create_binder_from_cards(
 
 def is_buddy(window, username: str) -> bool:
     return find_by_automation_id(window, f"MyBuddy-{username}") is not None
+
+
+def _wait_until_buddy(window, username: str, timeout: float = 6.0) -> bool:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if is_buddy(window, username):
+            return True
+        time.sleep(0.5)
+    return False
 
 
 def ensure_buddy(window, username: str) -> None:
@@ -522,11 +537,8 @@ def ensure_buddy(window, username: str) -> None:
     # fixed sleep here was observed to sometimes not be enough, causing
     # a false "not a buddy" reading right after this same buddy was
     # confirmed present moments earlier. Poll instead.
-    deadline = time.monotonic() + 6.0
-    while time.monotonic() < deadline:
-        if is_buddy(window, username):
-            return
-        time.sleep(0.5)
+    if _wait_until_buddy(window, username):
+        return
 
     add_btn = find_by_automation_id(window, "AddBuddyButton")
     if add_btn is None:
@@ -559,11 +571,8 @@ def ensure_buddy(window, username: str) -> None:
     time.sleep(0.5)
     entry_btn.click_input()
 
-    deadline = time.monotonic() + 6.0
-    while time.monotonic() < deadline:
-        if is_buddy(window, username):
-            return
-        time.sleep(0.5)
+    if _wait_until_buddy(window, username):
+        return
 
     raise MtgoAutomationError(f"buddy {username!r} was not added")
 
