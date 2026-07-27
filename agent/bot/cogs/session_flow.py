@@ -17,6 +17,19 @@ def _card_label(assignment: dict) -> str:
     return assignment.get("card_name") or f"Carte #{assignment['card_id']}"
 
 
+def _format_assignment_line(assignment: dict) -> str:
+    return f"- {_card_label(assignment)} (statut : {assignment['status']})"
+
+
+def _group_by_status(assignments: list[dict]) -> dict[str, list[dict]]:
+    groups: dict[str, list[dict]] = {}
+
+    for assignment in assignments:
+        groups.setdefault(assignment["status"], []).append(assignment)
+
+    return groups
+
+
 class MtgoUsernameModal(discord.ui.Modal, title="Confirme ton pseudo MTGO"):
     mtgo_username = discord.ui.TextInput(
         label="Pseudo MTGO",
@@ -135,36 +148,43 @@ class CorrectMtgoUsernameView(discord.ui.View):
 
 
 class AssignmentActionView(discord.ui.View):
-    """Sent by DM for a single card assignment. Shows the one action that
-    makes sense for the assignment's current status, if any.
+    """Sent by DM for a group of card assignments that share the same
+    status. Shows the one action that makes sense for that status, if
+    any, applied to every card in the group at once — a player usually
+    has several cards moving through the same step together, so one
+    button acting on the whole group beats one message+button per card
+    (and grammar/labels need to say "ces cartes", not "cette carte",
+    once there's more than one).
 
-    Note: because the assignment id is baked into each button's callback
-    closure, these views are not restored automatically if the bot process
-    restarts — a player would need to re-run /draft-session identification
-    (or the bot would need a persistent-view registry keyed by custom_id,
-    which is a reasonable follow-up once this is running for real).
+    Note: because the assignment ids are baked into the button's
+    callback closure, these views are not restored automatically if the
+    bot process restarts — a player would need to re-run /draft-session
+    identification (or the bot would need a persistent-view registry
+    keyed by custom_id, which is a reasonable follow-up once this is
+    running for real).
     """
 
     def __init__(
             self,
             cog: "SessionFlowCog",
-            assignment: dict,
+            assignments: list[dict],
     ):
         super().__init__(timeout=None)
         self.cog = cog
-        self.assignment_id = assignment["id"]
+        self.assignment_ids = [assignment["id"] for assignment in assignments]
 
-        status = assignment["status"]
+        status = assignments[0]["status"]
+        plural = len(assignments) > 1
 
         if status == "DISTRIBUTED":
             self._add_action_button(
-                "J'ai reçu cette carte",
+                "J'ai reçu ces cartes" if plural else "J'ai reçu cette carte",
                 "confirm",
                 discord.ButtonStyle.success,
             )
         elif status == "CONFIRMED":
             self._add_action_button(
-                "J'ai rendu cette carte",
+                "J'ai rendu ces cartes" if plural else "J'ai rendu cette carte",
                 "return",
                 discord.ButtonStyle.primary,
             )
@@ -178,18 +198,18 @@ class AssignmentActionView(discord.ui.View):
         button = discord.ui.Button(
             label=label,
             style=style,
-            custom_id=f"assignment:{self.assignment_id}:{action}",
+            custom_id=f"assignment-group:{self.assignment_ids[0]}:{action}",
         )
 
         async def callback(interaction: discord.Interaction):
             logger.info(
-                "Button clicked: assignment=%s action=%s",
-                self.assignment_id,
+                "Button clicked: assignments=%s action=%s",
+                self.assignment_ids,
                 action,
             )
             await self.cog.handle_assignment_action(
                 interaction,
-                self.assignment_id,
+                self.assignment_ids,
                 action,
             )
 
@@ -456,10 +476,7 @@ class SessionFlowCog(commands.Cog):
             ]
 
             for assignment in linked_assignments:
-                lines.append(
-                    f"- {_card_label(assignment)} "
-                    f"(statut : {assignment['status']})"
-                )
+                lines.append(_format_assignment_line(assignment))
 
             await dm_channel.send(
                 "\n".join(lines),
@@ -470,10 +487,13 @@ class SessionFlowCog(commands.Cog):
                 ),
             )
 
-            for assignment in linked_assignments:
+            for status, group in _group_by_status(linked_assignments).items():
+                if status not in ("DISTRIBUTED", "CONFIRMED"):
+                    continue
+
                 await dm_channel.send(
-                    _card_label(assignment),
-                    view=AssignmentActionView(self, assignment),
+                    "\n".join(_format_assignment_line(a) for a in group),
+                    view=AssignmentActionView(self, group),
                 )
 
         except discord.Forbidden:
@@ -494,31 +514,46 @@ class SessionFlowCog(commands.Cog):
     async def handle_assignment_action(
             self,
             interaction: discord.Interaction,
-            assignment_id: int,
+            assignment_ids: list[int],
             action: str,
     ):
-        try:
-            if action == "confirm":
-                result = await self.api_client.confirm_assignment(
-                    assignment_id,
-                )
-            else:
-                result = await self.api_client.return_assignment(
-                    assignment_id,
-                )
-        except CubeBotApiError as error:
+        results = []
+        errors = []
+
+        for assignment_id in assignment_ids:
+            try:
+                if action == "confirm":
+                    result = await self.api_client.confirm_assignment(
+                        assignment_id,
+                    )
+                else:
+                    result = await self.api_client.return_assignment(
+                        assignment_id,
+                    )
+                results.append(result)
+            except CubeBotApiError as error:
+                errors.append((assignment_id, error.detail))
+
+        if not results:
             await interaction.response.send_message(
-                f"Action impossible : {error.detail}",
+                f"Action impossible : {errors[0][1]}",
                 ephemeral=True,
             )
             return
+
+        lines = [_format_assignment_line(result) for result in results]
+
+        if errors:
+            lines.append("")
+            lines.append(
+                "⚠️ Une erreur est survenue pour au moins une carte — "
+                "relance l'action ou préviens un admin."
+            )
 
         # Respond by editing the clicked message directly, in one step —
         # more reliably reflected client-side than defer + a separate
         # followup + a separate message.edit() call.
         await interaction.response.edit_message(
-            content=(
-                f"{_card_label(result)} — statut : {result['status']}"
-            ),
-            view=AssignmentActionView(self, result),
+            content="\n".join(lines),
+            view=AssignmentActionView(self, results),
         )

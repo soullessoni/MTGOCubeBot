@@ -91,10 +91,12 @@ pendant qu'il tourne, puis une fois terminé :
    concernés et un menu déroulant pour que chacun sélectionne son nom.
 2. Le joueur choisit son nom → une fenêtre modale lui demande son
    pseudo MTGO exact.
-3. Une fois soumis, le bot lui envoie en message privé la liste de ses
-   cartes, chacune avec un bouton d'action adapté à son statut :
-   - `DISTRIBUTED` → **J'ai reçu cette carte** (passe en `CONFIRMED`)
-   - `CONFIRMED` → **J'ai rendu cette carte** (passe en `RETURNED`)
+3. Une fois soumis, le bot lui envoie en message privé la liste
+   complète de ses cartes, puis un message par statut regroupant les
+   cartes concernées avec un seul bouton d'action pour toutes à la
+   fois (accord au singulier/pluriel selon le nombre de cartes) :
+   - `DISTRIBUTED` → **J'ai reçu ces cartes** (passe en `CONFIRMED`)
+   - `CONFIRMED` → **J'ai rendu ces cartes** (passe en `RETURNED`)
 4. Un bouton **Corriger mon pseudo MTGO** reste disponible si le joueur
    s'est trompé — le soumettre relie à nouveau ses cartes et renvoie
    une liste fraîche.
