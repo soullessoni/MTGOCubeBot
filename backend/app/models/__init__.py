@@ -4,6 +4,7 @@ from app.models.cube_card import CubeCard
 from app.models.inventory_item import InventoryItem
 from app.models.loan_assignment import LoanAssignment
 from app.models.loan_session import LoanSession
+from app.models.mtgo_job import MtgoJob
 
 __all__ = [
     "Card",
@@ -12,4 +13,5 @@ __all__ = [
     "InventoryItem",
     "LoanAssignment",
     "LoanSession",
+    "MtgoJob",
 ]

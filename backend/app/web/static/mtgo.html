@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <title>MTGO CubeBot — Administration MTGO</title>
+    <link rel="stylesheet" href="dashboard.css"/>
+</head>
+<body>
+<header>
+    <a href="index.html">&larr; Sessions</a>
+    <h1>Administration MTGO</h1>
+    <button id="refresh-btn">Rafraîchir</button>
+</header>
+<main>
+    <p id="error-message" class="error" hidden></p>
+
+    <section class="mtgo-trigger-section">
+        <fieldset>
+            <legend>Distribution (don)</legend>
+            <input type="number" id="give-session-id" placeholder="ID session" min="1"/>
+            <button id="give-btn">Déclencher la distribution</button>
+        </fieldset>
+
+        <fieldset>
+            <legend>Récupération (retour)</legend>
+            <input type="number" id="return-session-id" placeholder="ID session" min="1"/>
+            <input type="text" id="return-mtgo-username" placeholder="Pseudo MTGO"/>
+            <button id="return-btn">Déclencher la récupération</button>
+        </fieldset>
+
+        <fieldset>
+            <legend>Intégrité du cube</legend>
+            <button id="integrity-check-btn">Vérifier l'intégrité du cube</button>
+        </fieldset>
+    </section>
+
+    <table>
+        <thead>
+        <tr>
+            <th>Job</th>
+            <th>Type</th>
+            <th>Statut</th>
+            <th>Session</th>
+            <th>Joueur</th>
+            <th>Créé le</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody id="mtgo-jobs-body"></tbody>
+    </table>
+    <p id="empty-message" hidden>Aucun job MTGO pour le moment.</p>
+
+    <div id="mtgo-job-detail"></div>
+</main>
+<script src="dashboard.js"></script>
+<script>
+    document.getElementById("refresh-btn").addEventListener("click", renderJobsTable);
+    renderMtgoAdmin();
+</script>
+</body>
+</html>

@@ -5,7 +5,9 @@ from discord.ext import commands
 
 from bot.api_client import CubeBotApiClient
 from bot.config import BotConfig
+from bot.cogs.mtgo_admin import MtgoAdminCog
 from bot.cogs.session_flow import SessionFlowCog
+from bot.error_handler import handle_app_command_error
 
 logging.basicConfig(level=logging.INFO)
 
@@ -26,6 +28,14 @@ class CubeBot(commands.Bot):
 
         self.config = config
         self.api_client = api_client
+        self.tree.on_error = self._on_app_command_error
+
+    async def _on_app_command_error(
+            self,
+            interaction: discord.Interaction,
+            error: discord.app_commands.AppCommandError,
+    ):
+        await handle_app_command_error(interaction, error)
 
     async def setup_hook(self):
         await self.add_cog(
@@ -34,6 +44,13 @@ class CubeBot(commands.Bot):
                 self.api_client,
                 self.config.category_name,
                 self.config.cleanup_interval_minutes,
+            )
+        )
+
+        await self.add_cog(
+            MtgoAdminCog(
+                self,
+                self.api_client,
             )
         )
 

@@ -27,8 +27,19 @@ Only processes the one named player per run — an admin retrieving from
 several players in one session runs this once per player, since each
 retrieval is a separate real-time negotiation with that specific
 person.
+
+Always prints exactly one final JSON line before exiting — this is the
+structured result an admin-triggered job (see the backend's MtgoJob
+runner) parses to record success/failure and surface the
+still_owed/to_give_back reconciliation for follow-up recovery actions,
+so any change to this script must keep that final line as the last
+thing printed. A RETURN job with `"ok": false` here means the trade
+completed but reconciliation found a discrepancy — it is NOT a process
+failure (that's the early `return 1` paths below, which still print
+their own `"ok": false` + `"error"` line).
 """
 
+import json
 import os
 import sys
 import time
@@ -83,124 +94,150 @@ def _mark_returned(assignment_id: int) -> None:
     response.raise_for_status()
 
 
+def _print_result(result: dict) -> None:
+    print(json.dumps(result))
+
+
 def main():
     sys.stdout.reconfigure(errors="replace")
 
     if len(sys.argv) != 3:
         print("Usage: python -m mtgo.process_session_returns <session_id> <mtgo_username>")
+        _print_result({"ok": False, "error": "usage: <session_id> <mtgo_username> required"})
         return 1
 
     session_id = int(sys.argv[1])
     mtgo_username = sys.argv[2]
 
-    session = _fetch_session(session_id)
-    assignments = _confirmed_assignments(session, mtgo_username)
-    card_names = [a["card_name"] for a in assignments]
+    try:
+        session = _fetch_session(session_id)
+        assignments = _confirmed_assignments(session, mtgo_username)
+        card_names = [a["card_name"] for a in assignments]
 
-    if not card_names:
-        print(f"No CONFIRMED cards found for {mtgo_username!r} in session {session_id}.")
-        return 0
+        if not card_names:
+            print(f"No CONFIRMED cards found for {mtgo_username!r} in session {session_id}.")
+            _print_result({
+                "ok": True,
+                "returned_count": 0,
+                "reconciliation": {"still_owed": {}, "to_give_back": {}},
+                "assignment_ids_returned": [],
+            })
+            return 0
 
-    print(f"Retrieving {len(card_names)} card(s) from {mtgo_username!r}: {card_names}")
+        print(f"Retrieving {len(card_names)} card(s) from {mtgo_username!r}: {card_names}")
 
-    bot_account = os.environ.get("MTGO_USERNAME")
-    bot_window = find_mtgo_window(bot_account)
-    if bot_window is None:
-        print("MTGO window not found.")
-        return 1
+        bot_account = os.environ.get("MTGO_USERNAME")
+        bot_window = find_mtgo_window(bot_account)
+        if bot_window is None:
+            print("MTGO window not found.")
+            _print_result({"ok": False, "error": "MTGO window not found."})
+            return 1
 
-    catid_map = load_default_catid_map()
-    if not catid_map:
-        print(
-            "  [WARN] no CatID map found — falling back to name-only matching, "
-            "which can grab the wrong printing. Export the bot account's Full "
-            "Trade List to mtgo/lists/full_trade_list.dek to fix this."
+        catid_map = load_default_catid_map()
+        if not catid_map:
+            print(
+                "  [WARN] no CatID map found — falling back to name-only matching, "
+                "which can grab the wrong printing. Export the bot account's Full "
+                "Trade List to mtgo/lists/full_trade_list.dek to fix this."
+            )
+
+        dismiss_trade_completed_popup(bot_window, timeout=3)
+        dismiss_added_to_collection_popup(bot_window, timeout=3)
+
+        bot_window.set_focus()
+        coll = find_by_automation_id(bot_window, "CollectionButton")
+        if coll:
+            coll.click_input()
+            time.sleep(2.0)
+        before_path = export_full_trade_list(bot_window, Path("mtgo/lists/_return_before.dek"))
+        before_qty = parse_dek_quantities(before_path)
+
+        request_trade_with_binder(bot_window, mtgo_username, "Full Trade List")
+        print(f"Trade request sent to {mtgo_username!r}, waiting for them to accept...")
+
+        trade_window = wait_for_trade_window(mtgo_username, timeout=300.0)
+        if trade_window is None:
+            print(f"{mtgo_username!r} did not accept the trade request within the timeout.")
+            _print_result({"ok": False, "error": f"{mtgo_username!r} did not accept the trade request."})
+            return 1
+
+        compare_dek = _write_dek_file(f"Return-{session_id}-{mtgo_username}", card_names, catid_map=catid_map)
+        clean = import_deck_for_comparison(
+            trade_window, compare_dek, viewer_username=bot_account, settle_timeout=25.0,
         )
+        print(f"Bulk decklist import (Search Tools): clean={clean}")
 
-    dismiss_trade_completed_popup(bot_window, timeout=3)
-    dismiss_added_to_collection_popup(bot_window, timeout=3)
+        staged = read_receiving_panel(trade_window, bot_account) if bot_account else set()
+        remaining = list(card_names)
+        for name in staged:
+            if name in remaining:
+                remaining.remove(name)
 
-    bot_window.set_focus()
-    coll = find_by_automation_id(bot_window, "CollectionButton")
-    if coll:
-        coll.click_input()
-        time.sleep(2.0)
-    before_path = export_full_trade_list(bot_window, Path("mtgo/lists/_return_before.dek"))
-    before_qty = parse_dek_quantities(before_path)
+        for card_name in remaining:
+            ok = add_card_from_partner_binder(trade_window, card_name, catid=catid_map.get(card_name), timeout=15.0)
+            if not ok:
+                print(f"  [SKIP] {card_name!r} not found in {mtgo_username!r}'s exposed binder")
 
-    request_trade_with_binder(bot_window, mtgo_username, "Full Trade List")
-    print(f"Trade request sent to {mtgo_username!r}, waiting for them to accept...")
+        submit_trade(trade_window)
+        print("Bot submitted.")
 
-    trade_window = wait_for_trade_window(mtgo_username, timeout=300.0)
-    if trade_window is None:
-        print(f"{mtgo_username!r} did not accept the trade request within the timeout.")
+        if not wait_for_confirm_trade_button(trade_window, timeout=300.0):
+            print("Confirm Trade never appeared — the other side may not have submitted yet.")
+            _print_result({"ok": False, "error": "Confirm Trade never appeared."})
+            return 1
+
+        confirm_trade(trade_window)
+        print("Bot confirmed.")
+
+        dismiss_added_to_collection_popup(bot_window, timeout=8)
+        dismiss_trade_completed_popup(bot_window, timeout=5)
+
+        bot_window.set_focus()
+        coll = find_by_automation_id(bot_window, "CollectionButton")
+        if coll:
+            coll.click_input()
+            time.sleep(2.0)
+        after_path = export_full_trade_list(bot_window, Path("mtgo/lists/_return_after.dek"))
+        after_qty = parse_dek_quantities(after_path)
+
+        reconciliation = compute_return_reconciliation(before_qty, after_qty, card_names)
+        still_owed = Counter(reconciliation["still_owed"])
+        to_give_back = reconciliation["to_give_back"]
+
+        # Mark RETURNED exactly as many of this player's CONFIRMED assignments
+        # per card name as the export diff actually confirms came back.
+        by_name: dict[str, list[int]] = {}
+        for assignment in assignments:
+            by_name.setdefault(assignment["card_name"], []).append(assignment["id"])
+
+        returned_count = 0
+        returned_assignment_ids: list[int] = []
+        for name, assignment_ids in by_name.items():
+            owed_here = still_owed.get(name, 0)
+            confirmed_returned = len(assignment_ids) - owed_here
+            for assignment_id in assignment_ids[:confirmed_returned]:
+                _mark_returned(assignment_id)
+                returned_count += 1
+                returned_assignment_ids.append(assignment_id)
+
+        print(f"Marked {returned_count}/{len(card_names)} assignment(s) RETURNED "
+              f"(confirmed by real export diff, not just the trade window).")
+
+        if still_owed:
+            print(f"  [ADMIN ACTION NEEDED] still owed, never came back: {dict(still_owed)}")
+        if to_give_back:
+            print(f"  [ADMIN ACTION NEEDED] received extra copies not owed — give back: {to_give_back}")
+
+        _print_result({
+            "ok": not still_owed and not to_give_back,
+            "returned_count": returned_count,
+            "reconciliation": {"still_owed": dict(still_owed), "to_give_back": to_give_back},
+            "assignment_ids_returned": returned_assignment_ids,
+        })
+        return 0
+    except Exception as error:
+        _print_result({"ok": False, "error": str(error)})
         return 1
-
-    compare_dek = _write_dek_file(f"Return-{session_id}-{mtgo_username}", card_names, catid_map=catid_map)
-    clean = import_deck_for_comparison(
-        trade_window, compare_dek, viewer_username=bot_account, settle_timeout=25.0,
-    )
-    print(f"Bulk decklist import (Search Tools): clean={clean}")
-
-    staged = read_receiving_panel(trade_window, bot_account) if bot_account else set()
-    remaining = list(card_names)
-    for name in staged:
-        if name in remaining:
-            remaining.remove(name)
-
-    for card_name in remaining:
-        ok = add_card_from_partner_binder(trade_window, card_name, catid=catid_map.get(card_name), timeout=15.0)
-        if not ok:
-            print(f"  [SKIP] {card_name!r} not found in {mtgo_username!r}'s exposed binder")
-
-    submit_trade(trade_window)
-    print("Bot submitted.")
-
-    if not wait_for_confirm_trade_button(trade_window, timeout=300.0):
-        print("Confirm Trade never appeared — the other side may not have submitted yet.")
-        return 1
-
-    confirm_trade(trade_window)
-    print("Bot confirmed.")
-
-    dismiss_added_to_collection_popup(bot_window, timeout=8)
-    dismiss_trade_completed_popup(bot_window, timeout=5)
-
-    bot_window.set_focus()
-    coll = find_by_automation_id(bot_window, "CollectionButton")
-    if coll:
-        coll.click_input()
-        time.sleep(2.0)
-    after_path = export_full_trade_list(bot_window, Path("mtgo/lists/_return_after.dek"))
-    after_qty = parse_dek_quantities(after_path)
-
-    reconciliation = compute_return_reconciliation(before_qty, after_qty, card_names)
-    still_owed = Counter(reconciliation["still_owed"])
-    to_give_back = reconciliation["to_give_back"]
-
-    # Mark RETURNED exactly as many of this player's CONFIRMED assignments
-    # per card name as the export diff actually confirms came back.
-    by_name: dict[str, list[int]] = {}
-    for assignment in assignments:
-        by_name.setdefault(assignment["card_name"], []).append(assignment["id"])
-
-    returned_count = 0
-    for name, assignment_ids in by_name.items():
-        owed_here = still_owed.get(name, 0)
-        confirmed_returned = len(assignment_ids) - owed_here
-        for assignment_id in assignment_ids[:confirmed_returned]:
-            _mark_returned(assignment_id)
-            returned_count += 1
-
-    print(f"Marked {returned_count}/{len(card_names)} assignment(s) RETURNED "
-          f"(confirmed by real export diff, not just the trade window).")
-
-    if still_owed:
-        print(f"  [ADMIN ACTION NEEDED] still owed, never came back: {dict(still_owed)}")
-    if to_give_back:
-        print(f"  [ADMIN ACTION NEEDED] received extra copies not owed — give back: {to_give_back}")
-
-    return 0
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 const API_BASE = "/loan/sessions";
 const INVENTORY_API_BASE = "/inventory";
+const MTGO_API_BASE = "/mtgo";
 
 const SESSION_ACTIONS = {
     CREATED: {label: "Marquer prête", endpoint: "ready"},
@@ -48,6 +49,21 @@ async function apiPost(path) {
 async function apiPut(path, body) {
     const response = await fetch(path, {
         method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.detail || `Erreur ${response.status}`);
+    }
+
+    return data;
+}
+
+async function apiPostJson(path, body) {
+    const response = await fetch(path, {
+        method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(body),
     });
@@ -304,4 +320,281 @@ async function renderInventory() {
             }
         });
     });
+}
+
+let mtgoJobsPollHandle = null;
+let selectedMtgoJobId = null;
+
+function jobStatusBadgeClass(status) {
+    return "badge status-" + status.toLowerCase();
+}
+
+async function renderMtgoAdmin() {
+    document.getElementById("give-btn").addEventListener("click", async () => {
+        clearError();
+        const sessionId = document.getElementById("give-session-id").value;
+
+        if (!sessionId) {
+            showError("ID de session requis.");
+            return;
+        }
+
+        try {
+            const job = await apiPost(`${MTGO_API_BASE}/sessions/${sessionId}/give`);
+            selectedMtgoJobId = job.id;
+            await renderJobsTable();
+            await renderJobDetail(job.id);
+        } catch (err) {
+            showError(err.message);
+        }
+    });
+
+    document.getElementById("return-btn").addEventListener("click", async () => {
+        clearError();
+        const sessionId = document.getElementById("return-session-id").value;
+        const mtgoUsername = document.getElementById("return-mtgo-username").value;
+
+        if (!sessionId || !mtgoUsername) {
+            showError("ID de session et pseudo MTGO requis.");
+            return;
+        }
+
+        try {
+            const job = await apiPostJson(`${MTGO_API_BASE}/sessions/${sessionId}/return`, {
+                mtgo_username: mtgoUsername,
+            });
+            selectedMtgoJobId = job.id;
+            await renderJobsTable();
+            await renderJobDetail(job.id);
+        } catch (err) {
+            showError(err.message);
+        }
+    });
+
+    document.getElementById("integrity-check-btn").addEventListener("click", async () => {
+        clearError();
+
+        try {
+            const job = await apiPost(`${MTGO_API_BASE}/integrity-check`);
+            selectedMtgoJobId = job.id;
+            await renderJobsTable();
+            await renderJobDetail(job.id);
+        } catch (err) {
+            showError(err.message);
+        }
+    });
+
+    await renderJobsTable();
+
+    if (mtgoJobsPollHandle) {
+        clearInterval(mtgoJobsPollHandle);
+    }
+
+    mtgoJobsPollHandle = setInterval(async () => {
+        await renderJobsTable();
+
+        if (selectedMtgoJobId) {
+            await renderJobDetail(selectedMtgoJobId);
+        }
+    }, 5000);
+}
+
+async function renderJobsTable() {
+    const tbody = document.getElementById("mtgo-jobs-body");
+    const emptyMessage = document.getElementById("empty-message");
+
+    if (!tbody) {
+        return;
+    }
+
+    let jobs;
+
+    try {
+        jobs = await apiGet(`${MTGO_API_BASE}/jobs/`);
+    } catch (err) {
+        showError("Impossible de charger les jobs MTGO.");
+        return;
+    }
+
+    tbody.innerHTML = "";
+
+    if (jobs.length === 0) {
+        emptyMessage.hidden = false;
+        return;
+    }
+
+    emptyMessage.hidden = true;
+
+    for (const job of jobs) {
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+            <td>#${job.id}</td>
+            <td>${job.job_type}</td>
+            <td><span class="${jobStatusBadgeClass(job.status)}">${job.status}</span></td>
+            <td>${job.session_id ?? "—"}</td>
+            <td>${job.mtgo_username ?? "—"}</td>
+            <td>${formatDate(job.created_at)}</td>
+            <td><button data-job-id="${job.id}" class="detail-job-btn">Détails</button></td>
+        `;
+
+        tbody.appendChild(row);
+    }
+
+    tbody.querySelectorAll(".detail-job-btn").forEach((button) => {
+        button.addEventListener("click", () => {
+            selectedMtgoJobId = parseInt(button.dataset.jobId, 10);
+            renderJobDetail(selectedMtgoJobId);
+        });
+    });
+}
+
+function renderReconciliationSection(reconciliation, job) {
+    const stillOwed = reconciliation.still_owed || {};
+    const toGiveBack = reconciliation.to_give_back || {};
+
+    if (Object.keys(stillOwed).length === 0 && Object.keys(toGiveBack).length === 0) {
+        return "<p>Aucun écart — tout est revenu comme prévu.</p>";
+    }
+
+    let html = "";
+
+    if (Object.keys(stillOwed).length > 0) {
+        html += "<h4>Encore dû</h4><ul>";
+        for (const [name, qty] of Object.entries(stillOwed)) {
+            html += `<li>${name} × ${qty}</li>`;
+        }
+        html += "</ul>";
+        html += `<button class="retry-job-btn" data-job-id="${job.id}">Relancer la récupération</button>`;
+    }
+
+    if (Object.keys(toGiveBack).length > 0) {
+        html += "<h4>Excédent reçu à rendre</h4><ul>";
+        for (const [name, qty] of Object.entries(toGiveBack)) {
+            html += `<li>${name} × ${qty}</li>`;
+        }
+        html += "</ul>";
+        html += `<button class="give-back-btn btn-danger" data-job-id="${job.id}" `
+            + `data-mtgo-username="${job.mtgo_username}" `
+            + `data-cards='${JSON.stringify(toGiveBack)}'>Rendre l'excédent</button>`;
+    }
+
+    return html;
+}
+
+function renderIntegritySection(result) {
+    const missing = result.missing || {};
+    const extra = result.extra || {};
+
+    if (Object.keys(missing).length === 0 && Object.keys(extra).length === 0) {
+        return "<p>Intégrité du cube OK — aucun écart avec la référence.</p>";
+    }
+
+    let html = "";
+
+    if (Object.keys(missing).length > 0) {
+        html += "<h4>Manquant</h4><ul>";
+        for (const [name, qty] of Object.entries(missing)) {
+            html += `<li>${name} × ${qty}</li>`;
+        }
+        html += "</ul>";
+    }
+
+    if (Object.keys(extra).length > 0) {
+        html += "<h4>En trop</h4><ul>";
+        for (const [name, qty] of Object.entries(extra)) {
+            html += `<li>${name} × ${qty}</li>`;
+        }
+        html += "</ul>";
+    }
+
+    return html;
+}
+
+function wireCorrectiveActionButtons(container) {
+    const retryBtn = container.querySelector(".retry-job-btn");
+
+    if (retryBtn) {
+        retryBtn.addEventListener("click", async () => {
+            clearError();
+
+            try {
+                const newJob = await apiPost(`${MTGO_API_BASE}/jobs/${retryBtn.dataset.jobId}/retry`);
+                selectedMtgoJobId = newJob.id;
+                await renderJobsTable();
+                await renderJobDetail(newJob.id);
+            } catch (err) {
+                showError(err.message);
+            }
+        });
+    }
+
+    const giveBackBtn = container.querySelector(".give-back-btn");
+
+    if (giveBackBtn) {
+        giveBackBtn.addEventListener("click", async () => {
+            const confirmed = window.confirm(
+                "Rendre l'excédent de cartes au joueur ? Cette action crée un binder réel côté bot."
+            );
+
+            if (!confirmed) {
+                return;
+            }
+
+            clearError();
+
+            try {
+                const cards = JSON.parse(giveBackBtn.dataset.cards);
+                const newJob = await apiPostJson(`${MTGO_API_BASE}/give-back`, {
+                    mtgo_username: giveBackBtn.dataset.mtgoUsername,
+                    cards: cards,
+                    retry_of_job_id: parseInt(giveBackBtn.dataset.jobId, 10),
+                });
+                selectedMtgoJobId = newJob.id;
+                await renderJobsTable();
+                await renderJobDetail(newJob.id);
+            } catch (err) {
+                showError(err.message);
+            }
+        });
+    }
+}
+
+async function renderJobDetail(jobId) {
+    const container = document.getElementById("mtgo-job-detail");
+
+    if (!container) {
+        return;
+    }
+
+    let job;
+
+    try {
+        job = await apiGet(`${MTGO_API_BASE}/jobs/${jobId}`);
+    } catch (err) {
+        showError("Job introuvable.");
+        return;
+    }
+
+    let html = `<h3>Job #${job.id} (${job.job_type}) — `
+        + `<span class="${jobStatusBadgeClass(job.status)}">${job.status}</span></h3>`;
+
+    if (job.error_message) {
+        html += `<p class="error">${job.error_message}</p>`;
+    }
+
+    if (job.log_output) {
+        html += `<pre class="job-log">${job.log_output}</pre>`;
+    }
+
+    if (job.result && job.result.reconciliation) {
+        html += renderReconciliationSection(job.result.reconciliation, job);
+    }
+
+    if (job.job_type === "INTEGRITY_CHECK" && job.result) {
+        html += renderIntegritySection(job.result);
+    }
+
+    container.innerHTML = html;
+    wireCorrectiveActionButtons(container);
 }

@@ -10,6 +10,7 @@ from app.api.loan import (
     sessions_router,
     assignments_router,
 )
+from app.api.mtgo import mtgo_router
 
 app = FastAPI(
     title="MTGO CubeBot API",
@@ -27,6 +28,10 @@ app.include_router(
 
 app.include_router(
     inventory_router,
+)
+
+app.include_router(
+    mtgo_router,
 )
 
 

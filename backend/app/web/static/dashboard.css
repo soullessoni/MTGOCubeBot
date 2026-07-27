@@ -93,6 +93,49 @@ button:hover {
 .status-confirmed { background: #c9f2e0; }
 .status-returned { background: #d4edda; }
 .status-cancelled { background: #f5c6cb; }
+.status-pending { background: #e0e0e0; }
+.status-running { background: #fff3cd; }
+.status-succeeded { background: #d4edda; }
+.status-failed { background: #f5c6cb; }
+
+.job-log {
+    background: #1a1a1a;
+    color: #e0e0e0;
+    padding: 0.75rem;
+    border-radius: 4px;
+    max-height: 240px;
+    overflow-y: auto;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+}
+
+.mtgo-trigger-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.mtgo-trigger-section fieldset {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.75rem 1rem;
+}
+
+.mtgo-trigger-section input {
+    padding: 0.35rem 0.5rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin-right: 0.5rem;
+}
+
+#mtgo-job-detail {
+    margin-top: 1.5rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+}
 
 .error {
     color: var(--error);

@@ -71,6 +71,72 @@ class CubeBotApiClient:
             f"/loan/sessions/assignments/{assignment_id}/return",
         )
 
+    async def trigger_give(
+            self,
+            session_id: int,
+            requested_by: str | None = None,
+    ) -> dict:
+        return await self._request(
+            "POST",
+            f"/mtgo/sessions/{session_id}/give",
+            json={"requested_by": requested_by},
+        )
+
+    async def trigger_return(
+            self,
+            session_id: int,
+            mtgo_username: str,
+            requested_by: str | None = None,
+    ) -> dict:
+        return await self._request(
+            "POST",
+            f"/mtgo/sessions/{session_id}/return",
+            json={
+                "mtgo_username": mtgo_username,
+                "requested_by": requested_by,
+            },
+        )
+
+    async def trigger_integrity_check(
+            self,
+            requested_by: str | None = None,
+    ) -> dict:
+        return await self._request(
+            "POST",
+            "/mtgo/integrity-check",
+            json={"requested_by": requested_by},
+        )
+
+    async def trigger_give_back(
+            self,
+            mtgo_username: str,
+            cards: dict[str, int],
+            requested_by: str | None = None,
+            retry_of_job_id: int | None = None,
+    ) -> dict:
+        return await self._request(
+            "POST",
+            "/mtgo/give-back",
+            json={
+                "mtgo_username": mtgo_username,
+                "cards": cards,
+                "requested_by": requested_by,
+                "retry_of_job_id": retry_of_job_id,
+            },
+        )
+
+    async def retry_job(self, job_id: int) -> dict:
+        return await self._request(
+            "POST",
+            f"/mtgo/jobs/{job_id}/retry",
+        )
+
+    async def get_job(self, job_id: int) -> dict:
+        return await self._request(
+            "GET",
+            f"/mtgo/jobs/{job_id}",
+        )
+
     async def _request(
             self,
             method: str,
