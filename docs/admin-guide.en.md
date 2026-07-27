@@ -59,7 +59,7 @@ The panel that triggers real actions on the bot's MTGO client.
 
 | Action | What it does |
 |---|---|
-| Trigger give | Creates (or updates) a session's MTGO binder with each identified player's `PREPARED` cards. The player then picks the cards up themselves via Search Tools/Import Deck on their own client. |
+| Trigger give | Creates a session's MTGO binder with each identified player's `PREPARED` cards, then sends them a real trade request exposing it. The player accepts and picks whatever they want via Search Tools; the bot submits and confirms its own (empty) side once they're done. What actually left the bot's account is then verified via export/diff, never by trusting the live trade window. |
 | Trigger return | Sends a trade request to the given MTGO player, waits for them to accept, then retrieves all of their `CONFIRMED` cards for that session. |
 | Check cube integrity | Compares the bot's real MTGO collection against the reference inventory (accounting for what's currently on loan) and reports any discrepancy. Read-only, no risk. |
 
@@ -69,6 +69,11 @@ row shows the ID, type, status, related session/player, and a
 
 **Job detail**: shows the live log (`log_output`) while it's running,
 then once finished:
+- For a **give**: lists what the player actually picked up (`given`)
+  and what they left on the table (`not_taken`) — a player is never
+  forced to take everything exposed. Whatever is confirmed `given`
+  becomes the reference a later return uses to know precisely what to
+  retrieve, instead of the nominal quantity originally planned.
 - For a **return**: if cards are still missing (`still_owed`) or an
   excess was received (`to_give_back`), a corrective-action button
   appears:

@@ -60,7 +60,7 @@ Le panneau qui déclenche les vraies actions sur le client MTGO du bot.
 
 | Action | Ce qu'elle fait |
 |---|---|
-| Déclencher la distribution | Crée (ou met à jour) le binder MTGO d'une session avec les cartes `PREPARED` de chaque joueur identifié. Le joueur récupère ensuite les cartes lui-même via Search Tools/Import Deck sur son propre client. |
+| Déclencher la distribution | Crée le binder MTGO d'une session avec les cartes `PREPARED` de chaque joueur identifié, puis lui envoie une vraie demande d'échange l'exposant. Le joueur accepte et pioche ce qu'il veut via Search Tools ; le bot soumet et confirme son propre côté (vide) une fois que le joueur a fini. Ce qui a réellement quitté le compte du bot est ensuite vérifié par export/diff, jamais en se fiant à la fenêtre d'échange en direct. |
 | Déclencher la récupération | Envoie une demande d'échange au joueur MTGO indiqué, attend qu'il accepte, puis récupère toutes ses cartes `CONFIRMED` pour cette session. |
 | Vérifier l'intégrité du cube | Compare la collection réelle du bot sur MTGO à l'inventaire de référence (en tenant compte de ce qui est actuellement en prêt), et remonte tout écart. Action en lecture seule, sans risque. |
 
@@ -70,6 +70,12 @@ joueur concerné, et un bouton "Détails".
 
 **Détail d'un job** : affiche le journal en direct (`log_output`)
 pendant qu'il tourne, puis une fois terminé :
+- Pour une **distribution** : liste ce que le joueur a effectivement
+  pioché (`given`) et ce qu'il a laissé sur la table (`not_taken`) —
+  un joueur n'est jamais obligé de tout prendre parmi ce qui est
+  exposé. Ce qui est confirmé `given` devient la référence utilisée par
+  la récupération suivante pour savoir précisément quoi reprendre, à la
+  place de la quantité nominale prévue au départ.
 - Pour une **récupération** : s'il manque des cartes (`still_owed`) ou
   qu'il y a un excédent reçu (`to_give_back`), un bouton de rattrapage
   apparaît :
