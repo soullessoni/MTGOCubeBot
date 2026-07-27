@@ -1,11 +1,54 @@
-# ops/ — process supervision for MTGOCubeBot
+# ops/ — running MTGOCubeBot
 
-This folder contains scripts to make the backend and Discord bot
-auto-restart on failure and auto-start on machine boot/logon, using
-Windows Task Scheduler.
+This folder contains two independent ways to start MTGOCubeBot:
+
+- **`start_all.ps1`** (+ the `Demarrer MTGOCubeBot.bat` launcher at the
+  repo root) — a manual, one-click, on-demand start: makes sure MTGO is
+  open and logged in, starts the backend and bot if they aren't already
+  running, and opens the dashboard. Idempotent — safe to double-click
+  again if some pieces are already up. Use this for a normal "I'm
+  sitting down to admin a session" start.
+- **`register_scheduled_tasks.ps1`** — always-on supervision: two
+  Windows Scheduled Tasks that auto-start the backend and bot at logon
+  and auto-restart them on crash, with no manual click at all. Use this
+  if you want the system running unattended all the time.
+
+These are independent — pick one, or use both (the scheduled tasks for
+always-on supervision, and `start_all.ps1`/the desktop shortcut for a
+manual restart or to open the dashboard on demand; each step in
+`start_all.ps1` checks first and skips anything already running, so
+running it while the scheduled tasks are also active is harmless).
 
 **Nothing here has been run yet.** These scripts only *define* scheduled
-tasks; a human needs to review and execute them.
+tasks or *start* the app on demand; a human needs to review and execute
+them (running `start_all.ps1`/the `.bat` is expected to be routine —
+it's the everyday launcher — but hasn't been exercised by Claude in
+this session; `register_scheduled_tasks.ps1` changes real machine
+config and needs explicit review first).
+
+## One-click startup — `start_all.ps1` / `Demarrer MTGOCubeBot.bat`
+
+Double-click `Demarrer MTGOCubeBot.bat` at the repo root (or run
+`powershell -ExecutionPolicy Bypass -File ops\start_all.ps1` directly).
+It will, in order:
+
+1. Check whether the bot's MTGO account is already open and logged in
+   (via `agent/mtgo/ensure_ready.py`) — launches MTGO and logs in only
+   if actually needed, rather than always restarting a perfectly good
+   session.
+2. Start the backend (uvicorn) in a minimized window, unless it's
+   already answering on port 8000.
+3. Start the Discord bot in a minimized window, unless a `bot.main`
+   process is already running.
+4. Wait for the backend to respond, then open the dashboard in your
+   default browser.
+
+**To get a proper desktop icon** (rather than a plain batch-file icon):
+right-click `Demarrer MTGOCubeBot.bat` → Send to → Desktop (create
+shortcut), then right-click the new desktop shortcut → Properties →
+Change Icon... and pick whatever you like (any `.ico`, or extract one
+from `shell32.dll`/`imageres.dll` for a built-in Windows icon). The
+shortcut still just runs the same `.bat`.
 
 ## Why Task Scheduler and not a Windows Service (NSSM, etc.)
 

@@ -172,6 +172,22 @@ cube change.
 
 ## Fiabilité en production
 
+### Démarrage en un clic
+
+Double-cliquer sur `Demarrer MTGOCubeBot.bat` (à la racine du dépôt)
+lance tout dans l'ordre : ouverture et connexion de MTGO si besoin
+(sans redémarrer une session déjà valide), backend, bot Discord, puis
+ouverture du dashboard dans le navigateur une fois le backend prêt.
+Chaque étape vérifie d'abord si c'est déjà en route — relancer le
+script quand tout tourne déjà ne fait rien de destructeur. Pour une
+icône de bureau plus parlante qu'un `.bat`, créer un raccourci vers ce
+fichier et lui assigner une icône personnalisée (voir `ops/README.md`).
+
+Un vrai `.exe` compilé n'apporte rien ici (aucune logique ne le
+justifie, juste des lancements de process dans l'ordre) et ajoute un
+risque réel de faux positif antivirus pour un exécutable maison non
+signé — le `.bat` + raccourci donne le même confort au quotidien.
+
 ### Supervision des process (démarrage auto + redémarrage)
 
 Le dossier `ops/` contient des scripts PowerShell qui déclarent deux
