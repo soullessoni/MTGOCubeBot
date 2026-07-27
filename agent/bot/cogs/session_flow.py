@@ -12,6 +12,19 @@ logger = logging.getLogger(__name__)
 SESSION_CHANNEL_PATTERN = re.compile(r"^draft-session-(\d+)$")
 TERMINAL_SESSION_STATUSES = ("COMPLETED", "CANCELLED")
 
+# custom_id shape for the assignment-group action button:
+#   assignment-group:<id1>-<id2>-...:<action>
+# Hyphen-joined ids rather than comma/colon-separated — colons already
+# delimit the three top-level segments, and a hyphen can't appear in an
+# int id, so there's no ambiguity when splitting back apart. Encoding the
+# full id list (not just the first one) plus the action into the
+# custom_id is what lets AssignmentGroupActionButton.from_custom_id
+# rebuild a working item after a bot restart, with no dependency on the
+# original Python object that built the button still being alive.
+ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN = re.compile(
+    r"^assignment-group:(?P<ids>\d+(?:-\d+)*):(?P<action>confirm|return)$"
+)
+
 
 def _card_label(assignment: dict) -> str:
     return assignment.get("card_name") or f"Carte #{assignment['card_id']}"
@@ -28,6 +41,24 @@ def _group_by_status(assignments: list[dict]) -> dict[str, list[dict]]:
         groups.setdefault(assignment["status"], []).append(assignment)
 
     return groups
+
+
+def _encode_assignment_group_custom_id(
+        assignment_ids: list[int],
+        action: str,
+) -> str:
+    ids_segment = "-".join(str(assignment_id) for assignment_id in assignment_ids)
+    return f"assignment-group:{ids_segment}:{action}"
+
+
+def _decode_assignment_group_match(
+        match: re.Match[str],
+) -> tuple[list[int], str]:
+    assignment_ids = [
+        int(part) for part in match.group("ids").split("-")
+    ]
+    action = match.group("action")
+    return assignment_ids, action
 
 
 class MtgoUsernameModal(discord.ui.Modal, title="Confirme ton pseudo MTGO"):
@@ -95,6 +126,14 @@ class PlayerSelectView(discord.ui.View):
     """Posted in the public session channel. Not player-restricted at the
     Discord permission level — the channel only ever shows player names,
     never card assignments, so it's safe for everyone in it to see.
+
+    Note: like AssignmentActionView used to be, PlayerSelect's callback
+    is a plain closure holding a `cog` reference, so this view is not
+    restored after a bot restart either. Its custom_id already encodes
+    everything needed (session_id) to rebuild via a discord.ui.DynamicItem
+    the same way AssignmentGroupActionButton does — left as a follow-up
+    rather than done here, to keep this change scoped to the assignment
+    action buttons.
     """
 
     def __init__(
@@ -114,6 +153,11 @@ class CorrectMtgoUsernameView(discord.ui.View):
     pseudo modal if they mistyped it — resubmitting restarts identification
     from that point (re-links every assignment and resends a fresh card
     list + action buttons).
+
+    Note: same restart-survival gap as PlayerSelect above — the button's
+    callback closure holds `self.cog`/`self.session_id`/`self.player_name`
+    directly rather than decoding them from the custom_id via a
+    discord.ui.DynamicItem. Left as a follow-up alongside PlayerSelect.
     """
 
     def __init__(
@@ -147,6 +191,82 @@ class CorrectMtgoUsernameView(discord.ui.View):
         self.add_item(button)
 
 
+class AssignmentGroupActionButton(
+        discord.ui.DynamicItem[discord.ui.Button],
+        template=ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN,
+):
+    """The confirm/return button for a group of card assignments, as a
+    discord.ui.DynamicItem (discord.py 2.4+) rather than a plain
+    discord.ui.Button with an inline closure callback.
+
+    A closure captures its assignment ids and cog reference in the
+    Python object that built it — fine for the process that sent the
+    message, but useless after a restart, since Discord only re-sends
+    the interaction's custom_id, never the original view object. A
+    DynamicItem instead gets rebuilt on demand: discord.py matches the
+    incoming custom_id against `template` and calls `from_custom_id`,
+    which decodes the assignment ids and action straight out of the
+    custom_id string (see ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN), so the
+    button keeps working even for messages sent by a previous process —
+    as long as this class is registered once via
+    `bot.add_dynamic_items(...)` in CubeBot.setup_hook.
+    """
+
+    def __init__(
+            self,
+            assignment_ids: list[int],
+            action: str,
+            label: str,
+            style: discord.ButtonStyle,
+    ):
+        super().__init__(
+            discord.ui.Button(
+                label=label,
+                style=style,
+                custom_id=_encode_assignment_group_custom_id(
+                    assignment_ids,
+                    action,
+                ),
+            )
+        )
+        self.assignment_ids = assignment_ids
+        self.action = action
+
+    @classmethod
+    async def from_custom_id(
+            cls,
+            interaction: discord.Interaction,
+            item: discord.ui.Item,
+            match: re.Match[str],
+            /,
+    ) -> "AssignmentGroupActionButton":
+        assignment_ids, action = _decode_assignment_group_match(match)
+
+        # Reconstructed from an already-sent message, so label/style just
+        # mirror what's already on screen — only assignment_ids/action
+        # (decoded above) matter for handling the click itself.
+        return cls(
+            assignment_ids,
+            action,
+            label=item.label,
+            style=item.style,
+        )
+
+    async def callback(self, interaction: discord.Interaction):
+        logger.info(
+            "Button clicked: assignments=%s action=%s",
+            self.assignment_ids,
+            self.action,
+        )
+
+        cog = interaction.client.get_cog("SessionFlowCog")
+        await cog.handle_assignment_action(
+            interaction,
+            self.assignment_ids,
+            self.action,
+        )
+
+
 class AssignmentActionView(discord.ui.View):
     """Sent by DM for a group of card assignments that share the same
     status. Shows the one action that makes sense for that status, if
@@ -156,12 +276,11 @@ class AssignmentActionView(discord.ui.View):
     (and grammar/labels need to say "ces cartes", not "cette carte",
     once there's more than one).
 
-    Note: because the assignment ids are baked into the button's
-    callback closure, these views are not restored automatically if the
-    bot process restarts — a player would need to re-run /draft-session
-    identification (or the bot would need a persistent-view registry
-    keyed by custom_id, which is a reasonable follow-up once this is
-    running for real).
+    The group action button is an AssignmentGroupActionButton
+    (discord.ui.DynamicItem) rather than a plain button with a closure,
+    specifically so it survives a bot restart — see that class's
+    docstring. This view itself carries no state beyond what's needed
+    to build the button; it isn't what makes the button restart-safe.
     """
 
     def __init__(
@@ -195,27 +314,14 @@ class AssignmentActionView(discord.ui.View):
             action: str,
             style: discord.ButtonStyle,
     ):
-        button = discord.ui.Button(
-            label=label,
-            style=style,
-            custom_id=f"assignment-group:{self.assignment_ids[0]}:{action}",
+        self.add_item(
+            AssignmentGroupActionButton(
+                self.assignment_ids,
+                action,
+                label,
+                style,
+            )
         )
-
-        async def callback(interaction: discord.Interaction):
-            logger.info(
-                "Button clicked: assignments=%s action=%s",
-                self.assignment_ids,
-                action,
-            )
-            await self.cog.handle_assignment_action(
-                interaction,
-                self.assignment_ids,
-                action,
-            )
-
-        button.callback = callback
-
-        self.add_item(button)
 
 
 class SessionFlowCog(commands.Cog):

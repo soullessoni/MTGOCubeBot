@@ -71,9 +71,14 @@ réelles.
 
 ## Limitation connue
 
-Les boutons de confirmation envoyés en MP (`AssignmentActionView`) ne
-survivent pas à un redémarrage du process du bot : l'identifiant de
-l'assignment est capturé dans une closure Python, pas dans un
-gestionnaire persistant basé sur `custom_id`. Si le bot doit tourner en
-continu sur la durée, il faudra ajouter un registre de vues persistantes
-(`bot.add_view(...)` au démarrage, dispatch par `custom_id`).
+Les boutons d'action groupée par carte (`AssignmentActionView` /
+`AssignmentGroupActionButton`) survivent désormais à un redémarrage du
+bot, via `discord.ui.DynamicItem` (custom_id encodant les IDs et
+l'action, dispatch par regex, enregistré une fois au démarrage avec
+`bot.add_dynamic_items(...)` dans `CubeBot.setup_hook`).
+
+`PlayerSelectView`/`PlayerSelect` (sélection du joueur) et
+`CorrectMtgoUsernameView` (bouton de correction du pseudo) ont
+toujours la limitation d'origine : leur état est capturé dans une
+closure Python et ne survit pas à un redémarrage. Suivre le même
+patron `DynamicItem` pour ces deux vues reste un follow-up.

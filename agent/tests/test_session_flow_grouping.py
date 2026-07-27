@@ -1,4 +1,10 @@
-from bot.cogs.session_flow import _format_assignment_line, _group_by_status
+from bot.cogs.session_flow import (
+    ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN,
+    _decode_assignment_group_match,
+    _encode_assignment_group_custom_id,
+    _format_assignment_line,
+    _group_by_status,
+)
 
 
 def make_assignment(id, card_name, status):
@@ -40,3 +46,36 @@ def test_group_by_status_preserves_order_within_a_group():
     groups = _group_by_status(assignments)
 
     assert [a["id"] for a in groups["CONFIRMED"]] == [1, 3]
+
+
+def test_encode_decode_assignment_group_custom_id_round_trips_single_id():
+    custom_id = _encode_assignment_group_custom_id([42], "confirm")
+
+    assert custom_id == "assignment-group:42:confirm"
+
+    match = ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN.match(custom_id)
+    assert match is not None
+
+    assignment_ids, action = _decode_assignment_group_match(match)
+    assert assignment_ids == [42]
+    assert action == "confirm"
+
+
+def test_encode_decode_assignment_group_custom_id_round_trips_several_ids():
+    custom_id = _encode_assignment_group_custom_id([1, 2, 3], "return")
+
+    assert custom_id == "assignment-group:1-2-3:return"
+
+    match = ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN.match(custom_id)
+    assert match is not None
+
+    assignment_ids, action = _decode_assignment_group_match(match)
+    assert assignment_ids == [1, 2, 3]
+    assert action == "return"
+
+
+def test_assignment_group_custom_id_pattern_rejects_unrelated_custom_id():
+    assert ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN.match("session:1:player-select") is None
+    assert ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN.match("assignment-group:1:delete") is None
+    assert ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN.match("assignment-group::confirm") is None
+    assert ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN.match("assignment-group:1-:confirm") is None

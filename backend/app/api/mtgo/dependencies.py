@@ -1,8 +1,13 @@
 from app.core.mtgo_agent_config import MtgoAgentConfig
+from app.core.notification_config import NotificationConfig
+from app.services.mtgo.mtgo_job_notifier_service import MtgoJobNotifierService
 from app.services.mtgo.mtgo_job_runner_service import MtgoJobRunnerService
 
 _runner = MtgoJobRunnerService(
     MtgoAgentConfig.from_env(),
+    MtgoJobNotifierService(
+        NotificationConfig.from_env(),
+    ),
 )
 
 

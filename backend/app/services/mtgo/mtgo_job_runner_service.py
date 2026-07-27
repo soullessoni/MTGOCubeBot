@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from app.core.mtgo_agent_config import MtgoAgentConfig
 from app.db.database import SessionLocal
 from app.models.mtgo_job import MtgoJob
+from app.services.mtgo.mtgo_job_notifier_service import MtgoJobNotifierService
 
 
 def parse_job_output(exit_code: int, stdout: str) -> tuple[str, dict | None, str | None]:
@@ -40,8 +41,13 @@ def parse_job_output(exit_code: int, stdout: str) -> tuple[str, dict | None, str
 
 
 class MtgoJobRunnerService:
-    def __init__(self, config: MtgoAgentConfig):
+    def __init__(
+            self,
+            config: MtgoAgentConfig,
+            notifier: MtgoJobNotifierService,
+    ):
         self.config = config
+        self.notifier = notifier
 
     def start(self, job_id: int, argv: list[str]) -> None:
         thread = threading.Thread(
@@ -53,6 +59,7 @@ class MtgoJobRunnerService:
 
     def _run(self, job_id: int, argv: list[str]) -> None:
         db = SessionLocal()
+        job = None
 
         try:
             job = db.get(MtgoJob, job_id)
@@ -94,4 +101,11 @@ class MtgoJobRunnerService:
             job.finished_at = datetime.now(UTC)
             db.commit()
         finally:
+            # Notified only after the terminal status is safely committed —
+            # `notifier.notify` guarantees it never raises, but it also
+            # lives outside the try/except above on purpose, so a bug in
+            # notification logic can never trigger the except branch and
+            # overwrite an already-committed status with FAILED.
+            if job is not None:
+                self.notifier.notify(job)
             db.close()

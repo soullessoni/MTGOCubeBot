@@ -147,6 +147,7 @@ mêmes boutons de rattrapage ("Relancer la récupération" /
 |---|---|
 | `MTGO_AGENT_DIR` | Dossier du projet `agent/` (contient les scripts MTGO), `<repo>/agent` par défaut. |
 | `MTGO_AGENT_PYTHON` | Interpréteur Python à utiliser pour lancer les jobs MTGO, `<agent>/.venv/Scripts/python.exe` par défaut. |
+| `DISCORD_ADMIN_WEBHOOK_URL` | Optionnel — URL d'un webhook Discord ; si renseignée, une notification y est postée automatiquement dès qu'un job échoue ou remonte un écart (voir « Fiabilité en production » ci-dessous). Sans elle, ces événements ne sont visibles qu'en consultant le dashboard ou `/mtgo-job-status`. |
 
 **Discord** : créer un rôle nommé exactement `Admin` sur le serveur et
 l'attribuer aux personnes autorisées à déclencher des actions MTGO —
@@ -168,3 +169,61 @@ chaque carte présente dans l'export, et remet à zéro toute carte de
 l'inventaire absente de l'export (donnée de test obsolète, carte
 retirée du cube, etc.). À relancer chaque fois que la composition du
 cube change.
+
+## Fiabilité en production
+
+### Supervision des process (démarrage auto + redémarrage)
+
+Le dossier `ops/` contient des scripts PowerShell qui déclarent deux
+tâches planifiées Windows (backend + bot Discord), avec redémarrage
+automatique en cas d'échec :
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ops\register_scheduled_tasks.ps1
+```
+
+**Important** : ces tâches tournent volontairement dans la session
+interactive de l'utilisateur connecté (déclencheur « à l'ouverture de
+session », pas « que l'utilisateur soit connecté ou non »). Un vrai
+service Windows (session 0) ne peut pas piloter le client MTGO via
+`pywinauto` — l'automatisation MTGO échouerait silencieusement tout en
+laissant croire que le backend fonctionne. Voir `ops/README.md` pour
+le détail, le rollback (`unregister_scheduled_tasks.ps1`), et comment
+vérifier l'état des tâches après coup.
+
+### Sauvegarde de la base de données
+
+Aucune sauvegarde n'était faite jusqu'ici. Un script copie
+`cubebot.db` vers `backend/backups/` avec horodatage, et supprime les
+plus anciennes au-delà d'une rétention configurable (30 par défaut) :
+
+```
+.venv/Scripts/python.exe scripts/backup_db.py [--keep N]
+```
+
+À planifier quotidiennement via le Planificateur de tâches Windows :
+Créer une tâche de base → déclencheur quotidien → action « Démarrer
+un programme » → programme `backend\.venv\Scripts\python.exe` →
+arguments `scripts\backup_db.py` → dossier de démarrage `backend\`.
+
+### Boutons Discord persistants
+
+Les boutons « J'ai reçu/rendu ces cartes » survivent maintenant à un
+redémarrage du bot (implémentés via `discord.ui.DynamicItem`, qui
+encode les identifiants directement dans le `custom_id` plutôt que
+dans une fermeture Python perdue au redémarrage). Le menu de
+sélection du joueur et le bouton de correction du pseudo MTGO n'ont
+pas encore ce traitement — voir `agent/README.md`.
+
+### Notification proactive en cas de problème
+
+Si `DISCORD_ADMIN_WEBHOOK_URL` est configurée côté backend, un message
+est posté automatiquement sur ce webhook dès qu'un job :
+- échoue franchement (`FAILED`) ;
+- ou se termine avec succès mais remonte un écart (retour incomplet,
+  excédent reçu, ou écart d'intégrité du cube).
+
+Sans cette variable, ces événements ne sont visibles qu'en consultant
+le dashboard ou `/mtgo-job-status` — configurer le webhook est
+recommandé avant de laisser le système tourner sans supervision
+active.
