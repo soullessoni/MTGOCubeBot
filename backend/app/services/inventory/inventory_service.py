@@ -36,11 +36,14 @@ class InventoryService:
 
         return item.quantity
 
-    def set_quantity(
+    def _stage_quantity(
             self,
             card: Card,
             quantity: int,
     ):
+        """Same as `set_quantity`, but leaves committing to the caller —
+        used by bulk operations that need to set many cards' quantities
+        in a single transaction instead of one commit per card."""
 
         item = self.get(card)
 
@@ -55,6 +58,12 @@ class InventoryService:
         else:
             item.quantity = quantity
 
+    def set_quantity(
+            self,
+            card: Card,
+            quantity: int,
+    ):
+        self._stage_quantity(card, quantity)
         self.db.commit()
 
     def list_all(self) -> list[InventoryItem]:

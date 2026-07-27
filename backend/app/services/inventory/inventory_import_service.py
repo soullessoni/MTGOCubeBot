@@ -27,20 +27,21 @@ class InventoryImportService:
             if card is None:
                 card = Card(name=name)
                 self.db.add(card)
-                self.db.commit()
-                self.db.refresh(card)
+                self.db.flush()
                 existing_cards[name] = card
                 created_cards.append(name)
 
-            self.inventory_service.set_quantity(card, quantity)
+            self.inventory_service._stage_quantity(card, quantity)
 
         for name, card in existing_cards.items():
             if name in quantities:
                 continue
 
             if self.inventory_service.get_quantity(card) > 0:
-                self.inventory_service.set_quantity(card, 0)
+                self.inventory_service._stage_quantity(card, 0)
                 zeroed_names.append(name)
+
+        self.db.commit()
 
         return {
             "created_cards": created_cards,

@@ -1,6 +1,7 @@
 import json
 import subprocess
 import threading
+import time
 from datetime import UTC, datetime
 
 from app.core.mtgo_agent_config import MtgoAgentConfig
@@ -40,6 +41,12 @@ def parse_job_output(exit_code: int, stdout: str) -> tuple[str, dict | None, str
     return "FAILED", None, f"process exited with code {exit_code}"
 
 
+# Live log tailing (dashboard/bot polling) only needs sub-second-ish
+# granularity — this bounds how often a verbose job's stdout gets
+# persisted, instead of committing to SQLite on every single line.
+LOG_COMMIT_INTERVAL_SECONDS = 1.0
+
+
 class MtgoJobRunnerService:
     def __init__(
             self,
@@ -76,16 +83,22 @@ class MtgoJobRunnerService:
             )
 
             output_lines: list[str] = []
+            last_log_commit_at = time.monotonic()
 
             for line in process.stdout:
                 output_lines.append(line.rstrip("\n"))
-                job.log_output = "\n".join(output_lines)
-                db.commit()
+                now = time.monotonic()
+                if now - last_log_commit_at >= LOG_COMMIT_INTERVAL_SECONDS:
+                    job.log_output = "\n".join(output_lines)
+                    db.commit()
+                    last_log_commit_at = now
+
+            job.log_output = "\n".join(output_lines)
 
             exit_code = process.wait()
             status, result, error_message = parse_job_output(
                 exit_code,
-                "\n".join(output_lines),
+                job.log_output,
             )
 
             job.status = status

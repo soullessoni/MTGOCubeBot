@@ -1,3 +1,5 @@
+from sqlalchemy import event
+
 from app.models.card import Card
 from app.services.inventory.inventory_import_service import InventoryImportService
 from app.services.inventory.inventory_service import InventoryService
@@ -74,3 +76,24 @@ def test_import_is_idempotent(db_session):
 
     assert result["created_cards"] == []
     assert db_session.query(Card).count() == 2
+
+
+def test_import_of_many_new_cards_commits_once_not_per_card(db_session):
+    service = InventoryImportService(db_session)
+    quantities = {f"Card {i}": i + 1 for i in range(30)}
+
+    commit_count = 0
+
+    def _count_commit(session):
+        nonlocal commit_count
+        commit_count += 1
+
+    event.listen(db_session, "after_commit", _count_commit)
+    try:
+        service.import_quantities(quantities)
+    finally:
+        event.remove(db_session, "after_commit", _count_commit)
+
+    # A bulk import of 30 new cards must not turn into 30+ individual
+    # SQLite commits (one per card creation, one more per quantity set).
+    assert commit_count <= 1
