@@ -16,25 +16,12 @@ runner) parses to record success/failure, so any change to this script
 must keep that final line as the last thing printed.
 """
 
-import json
 import os
 import sys
 
-import httpx
-from dotenv import load_dotenv
-
 from mtgo.catid_map import load_default_catid_map
+from mtgo.cli_common import enable_utf8_stdout, fetch_session, print_result
 from mtgo.client import create_binder_from_cards, find_mtgo_window
-
-load_dotenv()
-
-BACKEND_API_URL = os.environ.get("BACKEND_API_URL", "http://localhost:8000")
-
-
-def _fetch_session(session_id: int) -> dict:
-    response = httpx.get(f"{BACKEND_API_URL}/loan/sessions/{session_id}")
-    response.raise_for_status()
-    return response.json()
 
 
 def _group_prepared_cards_by_player(session: dict) -> tuple[dict[str, list[str]], list[str]]:
@@ -61,27 +48,23 @@ def _group_prepared_cards_by_player(session: dict) -> tuple[dict[str, list[str]]
     return by_player, skipped
 
 
-def _print_result(result: dict) -> None:
-    print(json.dumps(result))
-
-
 def main():
-    sys.stdout.reconfigure(errors="replace")
+    enable_utf8_stdout()
 
     if len(sys.argv) != 2:
         print("Usage: python -m mtgo.prepare_session_binders <session_id>")
-        _print_result({"ok": False, "error": "usage: <session_id> required"})
+        print_result({"ok": False, "error": "usage: <session_id> required"})
         return 1
 
     session_id = int(sys.argv[1])
 
     try:
-        session = _fetch_session(session_id)
+        session = fetch_session(session_id)
         by_player, skipped = _group_prepared_cards_by_player(session)
 
         if not by_player:
             print(f"No PREPARED assignments with an mtgo_username found for session {session_id}.")
-            _print_result({"ok": True, "created": {}, "failed": {}, "skipped_no_username": skipped})
+            print_result({"ok": True, "created": {}, "failed": {}, "skipped_no_username": skipped})
             return 0
 
         # Target the bot's own account explicitly rather than "whichever
@@ -92,7 +75,7 @@ def main():
         window = find_mtgo_window(os.environ.get("MTGO_USERNAME"))
         if window is None:
             print("MTGO window not found.")
-            _print_result({"ok": False, "error": "MTGO window not found."})
+            print_result({"ok": False, "error": "MTGO window not found."})
             return 1
 
         catid_map = load_default_catid_map()
@@ -117,7 +100,7 @@ def main():
                 print(f"{mtgo_username}: FAILED — {error}")
                 failed[mtgo_username] = str(error)
 
-        _print_result({
+        print_result({
             "ok": not failed,
             "created": created,
             "failed": failed,
@@ -125,7 +108,7 @@ def main():
         })
         return 0 if not failed else 1
     except Exception as error:
-        _print_result({"ok": False, "error": str(error)})
+        print_result({"ok": False, "error": str(error)})
         return 1
 
 

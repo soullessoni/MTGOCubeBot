@@ -174,17 +174,21 @@ class MtgoAdminCog(commands.Cog):
             interaction: discord.Interaction,
             job: dict,
     ) -> None:
-        for _ in range(POLL_MAX_ATTEMPTS):
-            await asyncio.sleep(POLL_INTERVAL_SECONDS)
+        # The job just got triggered, so it's essentially never already
+        # terminal — but skip the pointless first sleep in that case
+        # instead of waiting a full interval before reporting.
+        if job["status"] not in TERMINAL_JOB_STATUSES:
+            for _ in range(POLL_MAX_ATTEMPTS):
+                await asyncio.sleep(POLL_INTERVAL_SECONDS)
 
-            try:
-                job = await self.api_client.get_job(job["id"])
-            except CubeBotApiError as error:
-                logger.warning("Impossible de récupérer le job %s : %s", job["id"], error.detail)
-                continue
+                try:
+                    job = await self.api_client.get_job(job["id"])
+                except CubeBotApiError as error:
+                    logger.warning("Impossible de récupérer le job %s : %s", job["id"], error.detail)
+                    continue
 
-            if job["status"] in TERMINAL_JOB_STATUSES:
-                break
+                if job["status"] in TERMINAL_JOB_STATUSES:
+                    break
 
         view = None
 

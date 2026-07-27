@@ -25,12 +25,9 @@ import json
 import os
 import sys
 
-from dotenv import load_dotenv
-
 from mtgo.catid_map import load_default_catid_map
+from mtgo.cli_common import enable_utf8_stdout, print_result
 from mtgo.client import create_binder_from_cards, find_mtgo_window
-
-load_dotenv()
 
 
 def expand_cards_to_names(cards: dict[str, int]) -> list[str]:
@@ -43,16 +40,12 @@ def expand_cards_to_names(cards: dict[str, int]) -> list[str]:
     return names
 
 
-def _print_result(result: dict) -> None:
-    print(json.dumps(result))
-
-
 def main():
-    sys.stdout.reconfigure(errors="replace")
+    enable_utf8_stdout()
 
     if len(sys.argv) != 4:
         print("Usage: python -m mtgo.give_back_excess_cards <mtgo_username> <cards_json> <job_id>")
-        _print_result({"ok": False, "error": "usage: <mtgo_username> <cards_json> <job_id> required"})
+        print_result({"ok": False, "error": "usage: <mtgo_username> <cards_json> <job_id> required"})
         return 1
 
     mtgo_username = sys.argv[1]
@@ -63,13 +56,13 @@ def main():
         card_names = expand_cards_to_names(cards)
         if not card_names:
             print("No cards to give back.")
-            _print_result({"ok": False, "error": "cards must not be empty"})
+            print_result({"ok": False, "error": "cards must not be empty"})
             return 1
 
         window = find_mtgo_window(os.environ.get("MTGO_USERNAME"))
         if window is None:
             print("MTGO window not found.")
-            _print_result({"ok": False, "error": "MTGO window not found."})
+            print_result({"ok": False, "error": "MTGO window not found."})
             return 1
 
         catid_map = load_default_catid_map()
@@ -77,10 +70,10 @@ def main():
         label = create_binder_from_cards(window, binder_name, card_names, catid_map=catid_map)
         print(f"{mtgo_username}: {label} ({len(card_names)} cards)")
 
-        _print_result({"ok": True, "binder_label": label, "cards": cards})
+        print_result({"ok": True, "binder_label": label, "cards": cards})
         return 0
     except Exception as error:
-        _print_result({"ok": False, "error": str(error)})
+        print_result({"ok": False, "error": str(error)})
         return 1
 
 

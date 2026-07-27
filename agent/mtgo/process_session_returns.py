@@ -39,7 +39,6 @@ failure (that's the early `return 1` paths below, which still print
 their own `"ok": false` + `"error"` line).
 """
 
-import json
 import os
 import sys
 import time
@@ -47,9 +46,9 @@ from collections import Counter
 from pathlib import Path
 
 import httpx
-from dotenv import load_dotenv
 
 from mtgo.catid_map import load_default_catid_map
+from mtgo.cli_common import BACKEND_API_URL, enable_utf8_stdout, fetch_session, print_result
 from mtgo.client import (
     accept_incoming_trade_request,
     add_card_from_partner_binder,
@@ -69,16 +68,6 @@ from mtgo.client import (
 )
 from mtgo.stock_check import compute_return_reconciliation, parse_dek_quantities
 
-load_dotenv()
-
-BACKEND_API_URL = os.environ.get("BACKEND_API_URL", "http://localhost:8000")
-
-
-def _fetch_session(session_id: int) -> dict:
-    response = httpx.get(f"{BACKEND_API_URL}/loan/sessions/{session_id}")
-    response.raise_for_status()
-    return response.json()
-
 
 def _confirmed_assignments(session: dict, mtgo_username: str) -> list[dict]:
     return [
@@ -94,29 +83,25 @@ def _mark_returned(assignment_id: int) -> None:
     response.raise_for_status()
 
 
-def _print_result(result: dict) -> None:
-    print(json.dumps(result))
-
-
 def main():
-    sys.stdout.reconfigure(errors="replace")
+    enable_utf8_stdout()
 
     if len(sys.argv) != 3:
         print("Usage: python -m mtgo.process_session_returns <session_id> <mtgo_username>")
-        _print_result({"ok": False, "error": "usage: <session_id> <mtgo_username> required"})
+        print_result({"ok": False, "error": "usage: <session_id> <mtgo_username> required"})
         return 1
 
     session_id = int(sys.argv[1])
     mtgo_username = sys.argv[2]
 
     try:
-        session = _fetch_session(session_id)
+        session = fetch_session(session_id)
         assignments = _confirmed_assignments(session, mtgo_username)
         card_names = [a["card_name"] for a in assignments]
 
         if not card_names:
             print(f"No CONFIRMED cards found for {mtgo_username!r} in session {session_id}.")
-            _print_result({
+            print_result({
                 "ok": True,
                 "returned_count": 0,
                 "reconciliation": {"still_owed": {}, "to_give_back": {}},
@@ -130,7 +115,7 @@ def main():
         bot_window = find_mtgo_window(bot_account)
         if bot_window is None:
             print("MTGO window not found.")
-            _print_result({"ok": False, "error": "MTGO window not found."})
+            print_result({"ok": False, "error": "MTGO window not found."})
             return 1
 
         catid_map = load_default_catid_map()
@@ -158,7 +143,7 @@ def main():
         trade_window = wait_for_trade_window(mtgo_username, timeout=300.0)
         if trade_window is None:
             print(f"{mtgo_username!r} did not accept the trade request within the timeout.")
-            _print_result({"ok": False, "error": f"{mtgo_username!r} did not accept the trade request."})
+            print_result({"ok": False, "error": f"{mtgo_username!r} did not accept the trade request."})
             return 1
 
         compare_dek = _write_dek_file(f"Return-{session_id}-{mtgo_username}", card_names, catid_map=catid_map)
@@ -183,7 +168,7 @@ def main():
 
         if not wait_for_confirm_trade_button(trade_window, timeout=300.0):
             print("Confirm Trade never appeared — the other side may not have submitted yet.")
-            _print_result({"ok": False, "error": "Confirm Trade never appeared."})
+            print_result({"ok": False, "error": "Confirm Trade never appeared."})
             return 1
 
         confirm_trade(trade_window)
@@ -228,7 +213,7 @@ def main():
         if to_give_back:
             print(f"  [ADMIN ACTION NEEDED] received extra copies not owed — give back: {to_give_back}")
 
-        _print_result({
+        print_result({
             "ok": not still_owed and not to_give_back,
             "returned_count": returned_count,
             "reconciliation": {"still_owed": dict(still_owed), "to_give_back": to_give_back},
@@ -236,7 +221,7 @@ def main():
         })
         return 0
     except Exception as error:
-        _print_result({"ok": False, "error": str(error)})
+        print_result({"ok": False, "error": str(error)})
         return 1
 
 

@@ -14,15 +14,14 @@ process_session_returns.py's docstring for why this convention exists
 (the admin-triggered job runner parses it).
 """
 
-import json
 import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
-from dotenv import load_dotenv
 
+from mtgo.cli_common import BACKEND_API_URL, enable_utf8_stdout, print_result
 from mtgo.client import export_full_trade_list, find_mtgo_window
 from mtgo.stock_check import (
     HANDED_OUT_STATUSES,
@@ -30,10 +29,6 @@ from mtgo.stock_check import (
     diff_stock,
     parse_dek_quantities,
 )
-
-load_dotenv()
-
-BACKEND_API_URL = os.environ.get("BACKEND_API_URL", "http://localhost:8000")
 
 
 def _fetch_inventory() -> list[dict]:
@@ -63,12 +58,8 @@ def build_result(diff: dict, checked_at: str) -> dict:
     }
 
 
-def _print_result(result: dict) -> None:
-    print(json.dumps(result))
-
-
 def main():
-    sys.stdout.reconfigure(errors="replace")
+    enable_utf8_stdout()
 
     try:
         inventory = _fetch_inventory()
@@ -78,7 +69,7 @@ def main():
         window = find_mtgo_window(os.environ.get("MTGO_USERNAME"))
         if window is None:
             print("MTGO window not found.")
-            _print_result({"ok": False, "error": "MTGO window not found."})
+            print_result({"ok": False, "error": "MTGO window not found."})
             return 1
 
         export_path = export_full_trade_list(window, Path("mtgo/lists/_integrity_check.dek"))
@@ -96,10 +87,10 @@ def main():
         if not diff["missing"] and not diff["extra"]:
             print("  Cube integrity OK — no discrepancy.")
 
-        _print_result(result)
+        print_result(result)
         return 0
     except Exception as error:
-        _print_result({"ok": False, "error": str(error)})
+        print_result({"ok": False, "error": str(error)})
         return 1
 
 
