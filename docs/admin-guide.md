@@ -152,12 +152,19 @@ mêmes boutons de rattrapage ("Relancer la récupération" /
 l'attribuer aux personnes autorisées à déclencher des actions MTGO —
 ou leur donner la permission serveur "Administrateur".
 
-## Limitation connue
+## Peupler l'inventaire depuis un export MTGO réel
 
 La vérification d'intégrité du cube compare la collection MTGO réelle
-à la table `/inventory/` du backend. Si cette table n'a pas été
-peuplée avec la liste complète du cube (610 cartes), la vérification
-remontera un grand nombre de faux "excédent" pour toutes les cartes
-réellement présentes sur le compte mais absentes de l'inventaire de
-référence. Peupler `/inventory/` avec le cube complet est un
-pré-requis séparé pour que ce contrôle soit utile en pratique.
+à la table `/inventory/` du backend — elle n'est fiable que si cette
+table reflète le cube complet. Pour la (re)peupler depuis un vrai
+export "Full Trade List" :
+
+```
+.venv/Scripts/python.exe scripts/import_inventory_from_dek.py <chemin-vers-le-.dek>
+```
+
+Crée les cartes manquantes, met à jour les quantités possédées pour
+chaque carte présente dans l'export, et remet à zéro toute carte de
+l'inventaire absente de l'export (donnée de test obsolète, carte
+retirée du cube, etc.). À relancer chaque fois que la composition du
+cube change.
