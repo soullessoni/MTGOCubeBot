@@ -422,6 +422,18 @@ class SessionFlowCog(commands.Cog):
 
     @tasks.loop(minutes=2)
     async def cleanup_finished_sessions(self):
+        try:
+            sessions_by_id = {
+                session["id"]: session
+                for session in await self.api_client.list_sessions()
+            }
+        except CubeBotApiError as error:
+            logger.warning(
+                "Impossible de récupérer la liste des sessions : %s",
+                error.detail,
+            )
+            return
+
         for guild in self.bot.guilds:
             category = self._find_category(guild)
 
@@ -435,16 +447,13 @@ class SessionFlowCog(commands.Cog):
                     continue
 
                 session_id = int(match.group(1))
+                session = sessions_by_id.get(session_id)
 
-                try:
-                    session = await self.api_client.get_session(
-                        session_id,
-                    )
-                except CubeBotApiError as error:
+                if session is None:
                     logger.warning(
-                        "Impossible de vérifier la session %s : %s",
+                        "Session %s introuvable pour le salon %s",
                         session_id,
-                        error.detail,
+                        channel.name,
                     )
                     continue
 

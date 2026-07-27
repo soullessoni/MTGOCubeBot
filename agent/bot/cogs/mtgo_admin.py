@@ -138,6 +138,36 @@ class MtgoAdminCog(commands.Cog):
     ):
         self.bot = bot
         self.api_client = api_client
+        self._background_tasks: set[asyncio.Task] = set()
+
+    def _track_task(self, coro) -> asyncio.Task:
+        # asyncio only holds a weak reference to a task's coroutine — a
+        # task with no other reference can be garbage-collected mid-run.
+        # Keeping it in this set until it finishes prevents that.
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        return task
+
+    async def _trigger_and_poll(
+            self,
+            interaction: discord.Interaction,
+            trigger,
+            started_message: str,
+    ) -> None:
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            job = await trigger
+        except CubeBotApiError as error:
+            await interaction.followup.send(f"Erreur : {error.detail}", ephemeral=True)
+            return
+
+        await interaction.followup.send(
+            f"Job #{job['id']} démarré ({started_message}).",
+            ephemeral=True,
+        )
+        self._track_task(self._poll_and_report(interaction, job))
 
     async def _poll_and_report(
             self,
@@ -191,22 +221,14 @@ class MtgoAdminCog(commands.Cog):
             interaction: discord.Interaction,
             session_id: int,
     ):
-        await interaction.response.defer(ephemeral=True)
-
-        try:
-            job = await self.api_client.trigger_give(
+        await self._trigger_and_poll(
+            interaction,
+            self.api_client.trigger_give(
                 session_id,
                 requested_by=f"discord:{interaction.user.id}",
-            )
-        except CubeBotApiError as error:
-            await interaction.followup.send(f"Erreur : {error.detail}", ephemeral=True)
-            return
-
-        await interaction.followup.send(
-            f"Job #{job['id']} démarré (distribution, session {session_id}).",
-            ephemeral=True,
+            ),
+            f"distribution, session {session_id}",
         )
-        asyncio.create_task(self._poll_and_report(interaction, job))
 
     @app_commands.command(
         name="mtgo-return",
@@ -223,23 +245,15 @@ class MtgoAdminCog(commands.Cog):
             session_id: int,
             mtgo_username: str,
     ):
-        await interaction.response.defer(ephemeral=True)
-
-        try:
-            job = await self.api_client.trigger_return(
+        await self._trigger_and_poll(
+            interaction,
+            self.api_client.trigger_return(
                 session_id,
                 mtgo_username,
                 requested_by=f"discord:{interaction.user.id}",
-            )
-        except CubeBotApiError as error:
-            await interaction.followup.send(f"Erreur : {error.detail}", ephemeral=True)
-            return
-
-        await interaction.followup.send(
-            f"Job #{job['id']} démarré (récupération, session {session_id}, {mtgo_username}).",
-            ephemeral=True,
+            ),
+            f"récupération, session {session_id}, {mtgo_username}",
         )
-        asyncio.create_task(self._poll_and_report(interaction, job))
 
     @app_commands.command(
         name="mtgo-integrity-check",
@@ -250,21 +264,13 @@ class MtgoAdminCog(commands.Cog):
             self,
             interaction: discord.Interaction,
     ):
-        await interaction.response.defer(ephemeral=True)
-
-        try:
-            job = await self.api_client.trigger_integrity_check(
+        await self._trigger_and_poll(
+            interaction,
+            self.api_client.trigger_integrity_check(
                 requested_by=f"discord:{interaction.user.id}",
-            )
-        except CubeBotApiError as error:
-            await interaction.followup.send(f"Erreur : {error.detail}", ephemeral=True)
-            return
-
-        await interaction.followup.send(
-            f"Job #{job['id']} démarré (vérification d'intégrité).",
-            ephemeral=True,
+            ),
+            "vérification d'intégrité",
         )
-        asyncio.create_task(self._poll_and_report(interaction, job))
 
     @app_commands.command(
         name="mtgo-job-status",
