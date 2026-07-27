@@ -1000,12 +1000,12 @@ def import_deck_for_comparison(
                     return False
 
     if viewer_username is not None:
-        _wait_for_receiving_panel_to_settle(trade_window, viewer_username, settle_timeout)
+        wait_for_receiving_panel_to_settle(trade_window, viewer_username, settle_timeout)
 
     return True
 
 
-def _wait_for_receiving_panel_to_settle(
+def wait_for_receiving_panel_to_settle(
         trade_window,
         viewer_username: str,
         timeout: float,

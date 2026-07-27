@@ -7,18 +7,21 @@ incoming trade request on their own MTGO client, so it can't be a
 pure fire-and-forget script: it waits (with a generous timeout) for
 that to happen before it can pick cards.
 
-**Picking strategy (validated live 2026-07-25/26)**: Search Tools'
-Import Deck bulk-adds matching cards by name in one shot — much faster
-than searching one card at a time (~90% of a 40-card return in one
-pass) — with a per-card search as fallback for whatever it missed.
-Either way, correctness is verified afterward by diffing two real
-"Full Trade List" exports (before/after) against what was actually
-owed, NOT by trusting the live trade window: Import Deck's auto-add
-can grab extra copies of a name the player independently owns, or skip
-a name the bot already holds other copies of. Only assignments the
-export diff actually confirms as returned get marked RETURNED in the
-backend — anything else is reported for the admin to handle (V1 is
-admin-driven; this script doesn't attempt automatic correction trades).
+**Picking strategy (revised 2026-07-27)**: the bot selects every card
+itself via `add_card_from_partner_binder`'s exact-CatID matching,
+against exactly what `prepare_session_binders.py` recorded as actually
+given (`given_quantity`, falling back to the nominal `quantity` for
+assignments never run through that flow) — not Search Tools' bulk
+Import Deck, which matches by name only and can grab extra copies the
+player independently owns or skip ones the bot already holds. Trusting
+the bot's own precise selection over a bulk name-match is slower but
+correct by construction. Correctness is still verified afterward by
+diffing two real "Full Trade List" exports (before/after) against what
+was actually owed, NOT by trusting the live trade window's contents.
+Only assignments the export diff actually confirms as returned get
+marked RETURNED in the backend — anything else is reported for the
+admin to handle (V1 is admin-driven; this script doesn't attempt
+automatic correction trades).
 
 Usage:
   .venv/Scripts/python.exe -m mtgo.process_session_returns <session_id> <mtgo_username>
@@ -50,7 +53,6 @@ import httpx
 from mtgo.catid_map import load_default_catid_map
 from mtgo.cli_common import BACKEND_API_URL, enable_utf8_stdout, fetch_session, print_result
 from mtgo.client import (
-    accept_incoming_trade_request,
     add_card_from_partner_binder,
     confirm_trade,
     dismiss_added_to_collection_popup,
@@ -58,13 +60,10 @@ from mtgo.client import (
     export_full_trade_list,
     find_by_automation_id,
     find_mtgo_window,
-    import_deck_for_comparison,
-    read_receiving_panel,
     request_trade_with_binder,
     submit_trade,
     wait_for_confirm_trade_button,
     wait_for_trade_window,
-    _write_dek_file,
 )
 from mtgo.stock_check import compute_return_reconciliation, parse_dek_quantities
 
@@ -76,6 +75,20 @@ def _confirmed_assignments(session: dict, mtgo_username: str) -> list[dict]:
         if assignment["status"] == "CONFIRMED"
         and assignment.get("mtgo_username") == mtgo_username
     ]
+
+
+def _expected_card_names(assignments: list[dict]) -> list[str]:
+    """One entry per card actually owed back — `given_quantity` (what
+    the give trade's export diff confirmed actually left the account)
+    when known, falling back to 1 per assignment (the existing
+    convention) for assignments never run through that flow."""
+    names: list[str] = []
+    for assignment in assignments:
+        count = assignment.get("given_quantity")
+        if count is None:
+            count = 1
+        names.extend([assignment["card_name"]] * count)
+    return names
 
 
 def _mark_returned(assignment_id: int) -> None:
@@ -97,7 +110,7 @@ def main():
     try:
         session = fetch_session(session_id)
         assignments = _confirmed_assignments(session, mtgo_username)
-        card_names = [a["card_name"] for a in assignments]
+        card_names = _expected_card_names(assignments)
 
         if not card_names:
             print(f"No CONFIRMED cards found for {mtgo_username!r} in session {session_id}.")
@@ -146,19 +159,10 @@ def main():
             print_result({"ok": False, "error": f"{mtgo_username!r} did not accept the trade request."})
             return 1
 
-        compare_dek = _write_dek_file(f"Return-{session_id}-{mtgo_username}", card_names, catid_map=catid_map)
-        clean = import_deck_for_comparison(
-            trade_window, compare_dek, viewer_username=bot_account, settle_timeout=25.0,
-        )
-        print(f"Bulk decklist import (Search Tools): clean={clean}")
-
-        staged = read_receiving_panel(trade_window, bot_account) if bot_account else set()
-        remaining = list(card_names)
-        for name in staged:
-            if name in remaining:
-                remaining.remove(name)
-
-        for card_name in remaining:
+        # The bot picks every card itself, exact CatID first — it knows
+        # precisely what was given (given_quantity), so there's no
+        # reason to trust a bulk name-only match over its own selection.
+        for card_name in card_names:
             ok = add_card_from_partner_binder(trade_window, card_name, catid=catid_map.get(card_name), timeout=15.0)
             if not ok:
                 print(f"  [SKIP] {card_name!r} not found in {mtgo_username!r}'s exposed binder")
@@ -190,22 +194,30 @@ def main():
         to_give_back = reconciliation["to_give_back"]
 
         # Mark RETURNED exactly as many of this player's CONFIRMED assignments
-        # per card name as the export diff actually confirms came back.
-        by_name: dict[str, list[int]] = {}
+        # per card name as the export diff actually confirms came back. An
+        # assignment's status is all-or-nothing, so one whose given_quantity
+        # is > 1 only gets marked once every one of its copies is accounted
+        # for — a partial shortfall on it surfaces via still_owed instead.
+        by_name: dict[str, list[dict]] = {}
         for assignment in assignments:
-            by_name.setdefault(assignment["card_name"], []).append(assignment["id"])
+            by_name.setdefault(assignment["card_name"], []).append(assignment)
 
         returned_count = 0
         returned_assignment_ids: list[int] = []
-        for name, assignment_ids in by_name.items():
-            owed_here = still_owed.get(name, 0)
-            confirmed_returned = len(assignment_ids) - owed_here
-            for assignment_id in assignment_ids[:confirmed_returned]:
-                _mark_returned(assignment_id)
-                returned_count += 1
-                returned_assignment_ids.append(assignment_id)
+        for name, name_assignments in by_name.items():
+            total_expected = sum(a.get("given_quantity") or 1 for a in name_assignments)
+            confirmed_returned = total_expected - still_owed.get(name, 0)
 
-        print(f"Marked {returned_count}/{len(card_names)} assignment(s) RETURNED "
+            for assignment in name_assignments:
+                needed = assignment.get("given_quantity") or 1
+                if confirmed_returned < needed:
+                    continue
+                _mark_returned(assignment["id"])
+                returned_count += needed
+                returned_assignment_ids.append(assignment["id"])
+                confirmed_returned -= needed
+
+        print(f"Marked {returned_count}/{len(card_names)} card(s) RETURNED "
               f"(confirmed by real export diff, not just the trade window).")
 
         if still_owed:

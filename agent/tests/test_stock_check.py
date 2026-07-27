@@ -1,5 +1,6 @@
 from mtgo.stock_check import (
     compute_expected_quantities,
+    compute_give_confirmation,
     compute_return_reconciliation,
     diff_stock,
     parse_dek_quantities,
@@ -138,3 +139,57 @@ def test_compute_return_reconciliation_ignores_unrelated_baseline_changes():
     result = compute_return_reconciliation(before, after, ["Mulldrifter"])
 
     assert result == {"to_give_back": {}, "still_owed": {}}
+
+
+def test_compute_give_confirmation_confirms_exact_match():
+    before = {"Mulldrifter": 1}
+    after = {"Mulldrifter": 0}
+
+    result = compute_give_confirmation(before, after, ["Mulldrifter"])
+
+    assert result == {"given": {"Mulldrifter": 1}, "not_taken": {}}
+
+
+def test_compute_give_confirmation_flags_card_never_picked_up():
+    # The binder was exposed but the player only took some of what was
+    # offered — they're never forced to take everything.
+    before = {"Mulldrifter": 1}
+    after = {"Mulldrifter": 1}
+
+    result = compute_give_confirmation(before, after, ["Mulldrifter"])
+
+    assert result == {"given": {}, "not_taken": {"Mulldrifter": 1}}
+
+
+def test_compute_give_confirmation_handles_partial_pickup():
+    before = {"Snow-Covered Island": 2}
+    after = {"Snow-Covered Island": 1}
+
+    result = compute_give_confirmation(
+        before, after, ["Snow-Covered Island", "Snow-Covered Island"]
+    )
+
+    assert result == {
+        "given": {"Snow-Covered Island": 1},
+        "not_taken": {"Snow-Covered Island": 1},
+    }
+
+
+def test_compute_give_confirmation_ignores_unrelated_baseline_changes():
+    before = {"Mulldrifter": 1, "Unrelated Card": 3}
+    after = {"Mulldrifter": 0, "Unrelated Card": 5}
+
+    result = compute_give_confirmation(before, after, ["Mulldrifter"])
+
+    assert result == {"given": {"Mulldrifter": 1}, "not_taken": {}}
+
+
+def test_compute_give_confirmation_does_not_over_credit_unrelated_stock_loss():
+    # A concurrent, unrelated decrease in stock for a card that wasn't
+    # even offered in this give must never be recorded as "given".
+    before = {"Unrelated Card": 3}
+    after = {"Unrelated Card": 1}
+
+    result = compute_give_confirmation(before, after, ["Mulldrifter"])
+
+    assert result == {"given": {}, "not_taken": {"Mulldrifter": 1}}

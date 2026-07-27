@@ -68,6 +68,18 @@ class LoanAssignment(Base):
         nullable=True,
     )
 
+    # Set once, from a real before/after MTGO export diff, once the give
+    # trade for this assignment's card actually completes — the ground
+    # truth for what the player took (they aren't forced to take
+    # everything offered), used by the return flow to know exactly what
+    # to retrieve instead of trusting the nominal `quantity`. Null until
+    # then (or for assignments never run through the automated give
+    # flow).
+    given_quantity = Column(
+        Integer,
+        nullable=True,
+    )
+
     session = relationship(
         "LoanSession",
         back_populates="assignments",

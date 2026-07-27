@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from .discord_link import router as discord_link_router
+from .given_quantity import router as given_quantity_router
 from .hand_out import router as hand_out_router
 from .return_card import router as return_router
 
@@ -18,4 +19,8 @@ router.routes.extend(
 
 router.routes.extend(
     discord_link_router.routes
+)
+
+router.routes.extend(
+    given_quantity_router.routes
 )

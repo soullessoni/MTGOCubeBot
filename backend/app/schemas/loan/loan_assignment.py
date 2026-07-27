@@ -13,6 +13,7 @@ class LoanAssignmentResponse(BaseModel):
     created_at: datetime
     discord_user_id: str | None = None
     mtgo_username: str | None = None
+    given_quantity: int | None = None
 
     model_config = {
         "from_attributes": True,
@@ -22,3 +23,7 @@ class LoanAssignmentResponse(BaseModel):
 class LinkDiscordIdentityRequest(BaseModel):
     discord_user_id: str
     mtgo_username: str
+
+
+class RecordGivenQuantityRequest(BaseModel):
+    given_quantity: int

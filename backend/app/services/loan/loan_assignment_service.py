@@ -89,6 +89,20 @@ class LoanAssignmentService:
 
         return assignment
 
+    def record_given_quantity(
+            self,
+            assignment: LoanAssignment,
+            given_quantity: int,
+    ) -> LoanAssignment:
+        assignment.given_quantity = given_quantity
+
+        self.db.commit()
+        self.db.refresh(
+            assignment,
+        )
+
+        return assignment
+
     def force_cancel(
             self,
             assignment: LoanAssignment,

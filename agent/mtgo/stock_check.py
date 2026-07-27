@@ -119,3 +119,46 @@ def compute_return_reconciliation(
             still_owed[name] = needed - received
 
     return {"to_give_back": to_give_back, "still_owed": still_owed}
+
+
+def compute_give_confirmation(
+        before: dict[str, int],
+        after: dict[str, int],
+        offered_names: list[str],
+) -> dict[str, dict[str, int]]:
+    """The give-side mirror of `compute_return_reconciliation`: figure
+    out exactly which cards actually left the bot's account during a
+    give trade by diffing two real "Full Trade List" exports, rather
+    than trusting the live trade window — a player is never forced to
+    take everything offered, and Search Tools' own auto-add behavior
+    isn't something either side of a give trade drives (see
+    `prepare_session_binders.py`).
+
+    `offered_names` is one entry per card that was exposed to the
+    player (matching `create_binder_from_cards`'s convention — a name
+    repeated N times means N copies were offered).
+
+    Returns `{"given": {name: quantity}, "not_taken": {name: quantity}}`
+    — `given` is the confirmed ground truth to record as each
+    assignment's `given_quantity`; `not_taken` is what the player left
+    on the table. A stock decrease for a name that wasn't even offered
+    in this give (an unrelated concurrent change) is never credited as
+    "given" for this trade.
+    """
+    offered = Counter(offered_names)
+    names = set(before) | set(after) | set(offered)
+
+    given: dict[str, int] = {}
+    not_taken: dict[str, int] = {}
+
+    for name in names:
+        left_account = before.get(name, 0) - after.get(name, 0)
+        was_offered = offered.get(name, 0)
+        confirmed = max(0, min(left_account, was_offered))
+
+        if confirmed:
+            given[name] = confirmed
+        if was_offered > confirmed:
+            not_taken[name] = was_offered - confirmed
+
+    return {"given": given, "not_taken": not_taken}
