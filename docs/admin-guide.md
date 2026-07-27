@@ -1,5 +1,7 @@
 # Guide d'administration — MTGOCubeBot
 
+*[Read this in English](admin-guide.en.md)*
+
 Ce document décrit les écrans du dashboard web et les commandes du bot
 Discord utilisés pour administrer les sessions de prêt de cartes du
 Cube MTGO.
