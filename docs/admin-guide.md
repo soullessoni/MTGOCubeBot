@@ -208,12 +208,11 @@ arguments `scripts\backup_db.py` → dossier de démarrage `backend\`.
 
 ### Boutons Discord persistants
 
-Les boutons « J'ai reçu/rendu ces cartes » survivent maintenant à un
-redémarrage du bot (implémentés via `discord.ui.DynamicItem`, qui
-encode les identifiants directement dans le `custom_id` plutôt que
-dans une fermeture Python perdue au redémarrage). Le menu de
-sélection du joueur et le bouton de correction du pseudo MTGO n'ont
-pas encore ce traitement — voir `agent/README.md`.
+Tout le parcours joueur (boutons « J'ai reçu/rendu ces cartes », menu
+de sélection du joueur, bouton de correction du pseudo MTGO) survit
+maintenant à un redémarrage du bot, via `discord.ui.DynamicItem` — les
+identifiants nécessaires sont encodés directement dans le `custom_id`
+plutôt que capturés dans une fermeture Python perdue au redémarrage.
 
 ### Notification proactive en cas de problème
 

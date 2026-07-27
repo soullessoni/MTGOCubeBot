@@ -1,7 +1,11 @@
 from bot.cogs.session_flow import (
     ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN,
+    CORRECT_USERNAME_CUSTOM_ID_PATTERN,
+    PLAYER_SELECT_CUSTOM_ID_PATTERN,
     _decode_assignment_group_match,
     _encode_assignment_group_custom_id,
+    _encode_correct_username_custom_id,
+    _encode_player_select_custom_id,
     _format_assignment_line,
     _group_by_status,
 )
@@ -79,3 +83,46 @@ def test_assignment_group_custom_id_pattern_rejects_unrelated_custom_id():
     assert ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN.match("assignment-group:1:delete") is None
     assert ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN.match("assignment-group::confirm") is None
     assert ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN.match("assignment-group:1-:confirm") is None
+
+
+def test_encode_decode_player_select_custom_id_round_trips():
+    custom_id = _encode_player_select_custom_id(7)
+
+    assert custom_id == "session:7:player-select"
+
+    match = PLAYER_SELECT_CUSTOM_ID_PATTERN.match(custom_id)
+    assert match is not None
+    assert int(match.group("session_id")) == 7
+
+
+def test_player_select_custom_id_pattern_rejects_unrelated_custom_id():
+    assert PLAYER_SELECT_CUSTOM_ID_PATTERN.match("assignment-group:1:confirm") is None
+    assert PLAYER_SELECT_CUSTOM_ID_PATTERN.match("session:1:correct:Alice") is None
+    assert PLAYER_SELECT_CUSTOM_ID_PATTERN.match("session:player-select") is None
+
+
+def test_encode_decode_correct_username_custom_id_round_trips():
+    custom_id = _encode_correct_username_custom_id(7, "Alice")
+
+    assert custom_id == "session:7:correct:Alice"
+
+    match = CORRECT_USERNAME_CUSTOM_ID_PATTERN.match(custom_id)
+    assert match is not None
+    assert int(match.group("session_id")) == 7
+    assert match.group("player_name") == "Alice"
+
+
+def test_correct_username_custom_id_pattern_allows_colons_in_player_name():
+    # Player names are free text — a name containing a colon must still
+    # round-trip correctly since the pattern captures everything after
+    # the third "correct:" segment through to the end of the string.
+    custom_id = _encode_correct_username_custom_id(7, "Weird: Name")
+
+    match = CORRECT_USERNAME_CUSTOM_ID_PATTERN.match(custom_id)
+    assert match is not None
+    assert match.group("player_name") == "Weird: Name"
+
+
+def test_correct_username_custom_id_pattern_rejects_unrelated_custom_id():
+    assert CORRECT_USERNAME_CUSTOM_ID_PATTERN.match("session:1:player-select") is None
+    assert CORRECT_USERNAME_CUSTOM_ID_PATTERN.match("assignment-group:1:confirm") is None

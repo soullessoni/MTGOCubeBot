@@ -25,6 +25,14 @@ ASSIGNMENT_GROUP_CUSTOM_ID_PATTERN = re.compile(
     r"^assignment-group:(?P<ids>\d+(?:-\d+)*):(?P<action>confirm|return)$"
 )
 
+PLAYER_SELECT_CUSTOM_ID_PATTERN = re.compile(
+    r"^session:(?P<session_id>\d+):player-select$"
+)
+
+CORRECT_USERNAME_CUSTOM_ID_PATTERN = re.compile(
+    r"^session:(?P<session_id>\d+):correct:(?P<player_name>.+)$"
+)
+
 
 def _card_label(assignment: dict) -> str:
     return assignment.get("card_name") or f"Carte #{assignment['card_id']}"
@@ -61,7 +69,24 @@ def _decode_assignment_group_match(
     return assignment_ids, action
 
 
+def _encode_player_select_custom_id(session_id: int) -> str:
+    return f"session:{session_id}:player-select"
+
+
+def _encode_correct_username_custom_id(
+        session_id: int,
+        player_name: str,
+) -> str:
+    return f"session:{session_id}:correct:{player_name}"
+
+
 class MtgoUsernameModal(discord.ui.Modal, title="Confirme ton pseudo MTGO"):
+    """Fetches the cog from `interaction.client` at submit time rather
+    than holding a `cog` reference passed in at construction — this
+    modal is opened from restart-safe DynamicItem callbacks (see
+    PlayerSelect/CorrectUsernameButton below) which don't have an
+    in-memory cog reference of their own to hand it either."""
+
     mtgo_username = discord.ui.TextInput(
         label="Pseudo MTGO",
         placeholder="Ton nom d'utilisateur exact sur Magic Online",
@@ -70,17 +95,17 @@ class MtgoUsernameModal(discord.ui.Modal, title="Confirme ton pseudo MTGO"):
 
     def __init__(
             self,
-            cog: "SessionFlowCog",
             session_id: int,
             player_name: str,
     ):
         super().__init__()
-        self.cog = cog
         self.session_id = session_id
         self.player_name = player_name
 
     async def on_submit(self, interaction: discord.Interaction):
-        await self.cog.complete_identification(
+        cog = interaction.client.get_cog("SessionFlowCog")
+
+        await cog.complete_identification(
             interaction,
             self.session_id,
             self.player_name,
@@ -88,11 +113,26 @@ class MtgoUsernameModal(discord.ui.Modal, title="Confirme ton pseudo MTGO"):
         )
 
 
-class PlayerSelect(discord.ui.Select):
+class PlayerSelect(
+        discord.ui.DynamicItem[discord.ui.Select],
+        template=PLAYER_SELECT_CUSTOM_ID_PATTERN,
+):
+    """The player-name dropdown posted in a session's public channel, as
+    a discord.ui.DynamicItem (see AssignmentGroupActionButton's
+    docstring for the general pattern) so it survives a bot restart.
+
+    The only state needed to handle a click is `session_id`, decoded
+    straight from the custom_id — Discord already stores the rendered
+    options (the real player names) on the message itself, so a
+    reconstructed instance doesn't need the original `player_names`
+    list; an empty placeholder is enough since only `self.item.values`
+    (whichever option the player actually picked) matters at click
+    time, not the options this particular Python object was built
+    with.
+    """
 
     def __init__(
             self,
-            cog: "SessionFlowCog",
             session_id: int,
             player_names: list[str],
     ):
@@ -102,20 +142,31 @@ class PlayerSelect(discord.ui.Select):
         ]
 
         super().__init__(
-            placeholder="Sélectionne ton nom dans la liste",
-            options=options,
-            custom_id=f"session:{session_id}:player-select",
+            discord.ui.Select(
+                placeholder="Sélectionne ton nom dans la liste",
+                options=options,
+                custom_id=_encode_player_select_custom_id(session_id),
+            )
         )
-
-        self.cog = cog
         self.session_id = session_id
 
+    @classmethod
+    async def from_custom_id(
+            cls,
+            interaction: discord.Interaction,
+            item: discord.ui.Item,
+            match: re.Match[str],
+            /,
+    ) -> "PlayerSelect":
+        session_id = int(match.group("session_id"))
+
+        return cls(session_id, player_names=[])
+
     async def callback(self, interaction: discord.Interaction):
-        player_name = self.values[0]
+        player_name = self.item.values[0]
 
         await interaction.response.send_modal(
             MtgoUsernameModal(
-                self.cog,
                 self.session_id,
                 player_name,
             )
@@ -126,25 +177,65 @@ class PlayerSelectView(discord.ui.View):
     """Posted in the public session channel. Not player-restricted at the
     Discord permission level — the channel only ever shows player names,
     never card assignments, so it's safe for everyone in it to see.
-
-    Note: like AssignmentActionView used to be, PlayerSelect's callback
-    is a plain closure holding a `cog` reference, so this view is not
-    restored after a bot restart either. Its custom_id already encodes
-    everything needed (session_id) to rebuild via a discord.ui.DynamicItem
-    the same way AssignmentGroupActionButton does — left as a follow-up
-    rather than done here, to keep this change scoped to the assignment
-    action buttons.
     """
 
     def __init__(
             self,
-            cog: "SessionFlowCog",
             session_id: int,
             player_names: list[str],
     ):
         super().__init__(timeout=None)
         self.add_item(
-            PlayerSelect(cog, session_id, player_names)
+            PlayerSelect(session_id, player_names)
+        )
+
+
+class CorrectUsernameButton(
+        discord.ui.DynamicItem[discord.ui.Button],
+        template=CORRECT_USERNAME_CUSTOM_ID_PATTERN,
+):
+    """The "Corriger mon pseudo MTGO" button, as a discord.ui.DynamicItem
+    for the same restart-survival reason as AssignmentGroupActionButton
+    and PlayerSelect — session_id and player_name are decoded straight
+    from the custom_id rather than captured in a Python closure."""
+
+    def __init__(
+            self,
+            session_id: int,
+            player_name: str,
+    ):
+        super().__init__(
+            discord.ui.Button(
+                label="Corriger mon pseudo MTGO",
+                style=discord.ButtonStyle.secondary,
+                custom_id=_encode_correct_username_custom_id(
+                    session_id,
+                    player_name,
+                ),
+            )
+        )
+        self.session_id = session_id
+        self.player_name = player_name
+
+    @classmethod
+    async def from_custom_id(
+            cls,
+            interaction: discord.Interaction,
+            item: discord.ui.Item,
+            match: re.Match[str],
+            /,
+    ) -> "CorrectUsernameButton":
+        session_id = int(match.group("session_id"))
+        player_name = match.group("player_name")
+
+        return cls(session_id, player_name)
+
+    async def callback(self, interaction: discord.Interaction):
+        await interaction.response.send_modal(
+            MtgoUsernameModal(
+                self.session_id,
+                self.player_name,
+            )
         )
 
 
@@ -153,42 +244,17 @@ class CorrectMtgoUsernameView(discord.ui.View):
     pseudo modal if they mistyped it — resubmitting restarts identification
     from that point (re-links every assignment and resends a fresh card
     list + action buttons).
-
-    Note: same restart-survival gap as PlayerSelect above — the button's
-    callback closure holds `self.cog`/`self.session_id`/`self.player_name`
-    directly rather than decoding them from the custom_id via a
-    discord.ui.DynamicItem. Left as a follow-up alongside PlayerSelect.
     """
 
     def __init__(
             self,
-            cog: "SessionFlowCog",
             session_id: int,
             player_name: str,
     ):
         super().__init__(timeout=None)
-        self.cog = cog
-        self.session_id = session_id
-        self.player_name = player_name
-
-        button = discord.ui.Button(
-            label="Corriger mon pseudo MTGO",
-            style=discord.ButtonStyle.secondary,
-            custom_id=f"session:{session_id}:correct:{player_name}",
+        self.add_item(
+            CorrectUsernameButton(session_id, player_name)
         )
-
-        async def callback(interaction: discord.Interaction):
-            await interaction.response.send_modal(
-                MtgoUsernameModal(
-                    self.cog,
-                    self.session_id,
-                    self.player_name,
-                )
-            )
-
-        button.callback = callback
-
-        self.add_item(button)
 
 
 class AssignmentGroupActionButton(
@@ -472,7 +538,7 @@ class SessionFlowCog(commands.Cog):
             f"Joueurs concernés : {', '.join(player_names)}\n\n"
             f"Clique sur ton nom ci-dessous pour confirmer ton pseudo "
             f"MTGO et recevoir en message privé la liste de tes cartes.",
-            view=PlayerSelectView(self, session_id, player_names),
+            view=PlayerSelectView(session_id, player_names),
         )
 
         await interaction.followup.send(
@@ -587,7 +653,6 @@ class SessionFlowCog(commands.Cog):
             await dm_channel.send(
                 "\n".join(lines),
                 view=CorrectMtgoUsernameView(
-                    self,
                     session_id,
                     player_name,
                 ),

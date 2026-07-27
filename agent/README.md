@@ -69,16 +69,20 @@ Le reste (`bot/cogs/session_flow.py`, `bot/main.py`) nécessite une vraie
 connexion Discord pour être validé — pas encore testé en conditions
 réelles.
 
-## Limitation connue
+## Robustesse au redémarrage
 
-Les boutons d'action groupée par carte (`AssignmentActionView` /
-`AssignmentGroupActionButton`) survivent désormais à un redémarrage du
-bot, via `discord.ui.DynamicItem` (custom_id encodant les IDs et
-l'action, dispatch par regex, enregistré une fois au démarrage avec
-`bot.add_dynamic_items(...)` dans `CubeBot.setup_hook`).
+Tous les composants interactifs du parcours joueur survivent
+désormais à un redémarrage du bot, via `discord.ui.DynamicItem`
+(custom_id encodant l'état nécessaire — session_id, IDs d'assignment,
+nom du joueur — plutôt qu'une fermeture Python perdue au redémarrage) :
 
-`PlayerSelectView`/`PlayerSelect` (sélection du joueur) et
-`CorrectMtgoUsernameView` (bouton de correction du pseudo) ont
-toujours la limitation d'origine : leur état est capturé dans une
-closure Python et ne survit pas à un redémarrage. Suivre le même
-patron `DynamicItem` pour ces deux vues reste un follow-up.
+- `AssignmentGroupActionButton` (boutons « J'ai reçu/rendu ces
+  cartes ») ;
+- `PlayerSelect` (menu de sélection du joueur) ;
+- `CorrectUsernameButton` (bouton de correction du pseudo MTGO).
+
+Les trois classes sont enregistrées une fois au démarrage avec
+`bot.add_dynamic_items(...)` dans `CubeBot.setup_hook`. `MtgoUsernameModal`
+récupère le cog via `interaction.client.get_cog(...)` au moment de la
+soumission plutôt que de le recevoir en paramètre, pour rester
+cohérent avec ce fonctionnement.

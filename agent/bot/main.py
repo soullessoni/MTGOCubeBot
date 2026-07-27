@@ -6,7 +6,12 @@ from discord.ext import commands
 from bot.api_client import CubeBotApiClient
 from bot.config import BotConfig
 from bot.cogs.mtgo_admin import MtgoAdminCog
-from bot.cogs.session_flow import AssignmentGroupActionButton, SessionFlowCog
+from bot.cogs.session_flow import (
+    AssignmentGroupActionButton,
+    CorrectUsernameButton,
+    PlayerSelect,
+    SessionFlowCog,
+)
 from bot.error_handler import handle_app_command_error
 
 logging.basicConfig(level=logging.INFO)
@@ -38,14 +43,19 @@ class CubeBot(commands.Bot):
         await handle_app_command_error(interaction, error)
 
     async def setup_hook(self):
-        # Registers the class (not an instance) so discord.py can match its
-        # template regex against incoming custom_ids and rebuild the button
-        # on demand — this is what makes assignment-group buttons on
-        # messages sent by a previous process still work after a restart.
-        # Must happen once here rather than per-view, since views built
-        # later (e.g. inside AssignmentActionView) never get a chance to
-        # register anything themselves once the original process is gone.
-        self.add_dynamic_items(AssignmentGroupActionButton)
+        # Registers the classes (not instances) so discord.py can match
+        # their template regexes against incoming custom_ids and rebuild
+        # the item on demand — this is what makes these components, on
+        # messages sent by a previous process, still work after a
+        # restart. Must happen once here rather than per-view, since
+        # views built later (e.g. inside AssignmentActionView) never get
+        # a chance to register anything themselves once the original
+        # process is gone.
+        self.add_dynamic_items(
+            AssignmentGroupActionButton,
+            PlayerSelect,
+            CorrectUsernameButton,
+        )
 
         await self.add_cog(
             SessionFlowCog(
