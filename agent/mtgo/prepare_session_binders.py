@@ -43,7 +43,8 @@ import httpx
 from mtgo.catid_map import load_default_catid_map
 from mtgo.cli_common import BACKEND_API_URL, enable_utf8_stdout, fetch_session, print_result
 from mtgo.client import (
-    add_card_from_partner_binder,
+    add_tickets_to_trade,
+    cancel_trade,
     confirm_trade,
     create_binder_from_cards,
     dismiss_added_to_collection_popup,
@@ -134,10 +135,8 @@ def _complete_give_trade(
     (see `compute_give_confirmation`).
 
     If `deposit_amount` is set and the full amount can't be pulled from
-    the player's collection, this raises *before* submitting — MTGO
-    only moves anything once both sides confirm, so leaving the trade
-    unsubmitted is an all-or-nothing cancellation with no separate
-    "cancel trade" click needed (none was found/verified live).
+    the player's collection, this cancels the trade and raises — an
+    all-or-nothing cancellation, so no cards change hands either.
 
     Raises on any step that doesn't complete (acceptance timeout, no
     Confirm Trade button, insufficient deposit, or any underlying
@@ -162,20 +161,24 @@ def _complete_give_trade(
         # same CardQuantityControl mechanism as cards — confirmed live
         # 2026-07-29 — so the bot pulls them from the player's own
         # collection exactly like process_session_returns.py pulls
-        # cards back.
+        # cards back. add_tickets_to_trade adds the whole amount in one
+        # search + right-click "Add More to Trade" instead of one
+        # search+double-click per unit.
         select_other_products_tickets_filter(trade_window)
-        collected = 0
-        for _ in range(deposit_amount):
-            if add_card_from_partner_binder(trade_window, "Event Ticket", catid="1", timeout=15.0):
-                collected += 1
+        added = add_tickets_to_trade(trade_window, deposit_amount, timeout=15.0)
         select_cards_filter(trade_window)
 
-        if collected < deposit_amount:
+        if not added:
+            # Confirmed live 2026-07-29: Cancel Trade needs invoke(),
+            # not click_input(). Cancelling explicitly closes the
+            # window instead of leaving a dangling unconfirmed trade
+            # for the admin to clean up by hand.
+            cancel_trade(trade_window)
             raise RuntimeError(
-                f"Could only pull {collected}/{deposit_amount} deposit ticket(s) from "
-                f"{mtgo_username!r}'s collection — leaving the trade unconfirmed, nothing transfers."
+                f"Could not pull {deposit_amount} deposit ticket(s) from "
+                f"{mtgo_username!r}'s collection — cancelled the trade, nothing transfers."
             )
-        print(f"Pulled {collected}/{deposit_amount} deposit ticket(s) from {mtgo_username!r}.")
+        print(f"Requested {deposit_amount} deposit ticket(s) from {mtgo_username!r}.")
 
     # Confirmed live 2026-07-27: submitting immediately (before the
     # player has picked anything) risks the bot's submit being silently

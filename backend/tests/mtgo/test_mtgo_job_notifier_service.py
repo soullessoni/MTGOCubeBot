@@ -150,6 +150,46 @@ def test_succeeded_give_returns_none():
     assert message is None
 
 
+def test_succeeded_give_with_not_taken_describes_it():
+    job = _make_job(
+        job_type="GIVE",
+        status="SUCCEEDED",
+        result={
+            "ok": False,
+            "given": {"FruitDuChene": {}},
+            "not_taken": {"FruitDuChene": {"Wingcrafter": 1}},
+            "deposits_collected": {},
+            "failed": {},
+            "skipped_no_username": [],
+        },
+    )
+
+    message = build_notification_message(job)
+
+    assert message is not None
+    assert "FruitDuChene" in message
+    assert "Wingcrafter" in message
+
+
+def test_succeeded_give_all_taken_returns_none():
+    job = _make_job(
+        job_type="GIVE",
+        status="SUCCEEDED",
+        result={
+            "ok": True,
+            "given": {"FruitDuChene": {"Wingcrafter": 1}},
+            "not_taken": {},
+            "deposits_collected": {"FruitDuChene": 5},
+            "failed": {},
+            "skipped_no_username": [],
+        },
+    )
+
+    message = build_notification_message(job)
+
+    assert message is None
+
+
 def test_succeeded_give_back_returns_none():
     job = _make_job(
         job_type="GIVE_BACK",

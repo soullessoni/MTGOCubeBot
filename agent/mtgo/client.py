@@ -751,6 +751,107 @@ def select_cards_filter(window) -> None:
     time.sleep(1.0)
 
 
+def add_tickets_to_trade(trade_window, quantity: int, timeout: float = 15.0) -> bool:
+    """Add exactly `quantity` Event Tickets from the counterparty's
+    collection to our own receiving panel in **one action** — search
+    once, right-click the resulting stack, "Add More to Trade", type
+    the exact number — instead of one search+double-click per unit
+    like `add_card_from_partner_binder` would need. Confirmed live
+    2026-07-29 (right-click on a `CardQuantityControl` in a trade
+    window offers "Add 1/4/10 to Trade", "Add More to Trade" — a dialog
+    with a `CardQuantityIntegerUpDown` text box you can type an exact
+    number into — and "Add All to Trade").
+
+    If the counterparty has fewer than `quantity` available, MTGO caps
+    the box's value when you tab out of it rather than accepting the
+    typed number — detected here by reading the box back and cancelling
+    the "Add More" dialog instead of committing a silently-short
+    amount. (This specific short-supply path hasn't been exercised
+    live — only the enough-supply path has — so treat it as a
+    reasonable guess pending confirmation.)
+
+    Returns False if the search/menu/dialog sequence doesn't complete,
+    or if fewer than `quantity` turned out to be available."""
+    search_box = find_by_automation_id(trade_window, "searchTextBox")
+    search_btn = find_by_automation_id(trade_window, "SearchButton")
+    if search_box is None or search_btn is None:
+        raise MtgoAutomationError("searchTextBox/SearchButton not found in trade window")
+
+    search_box.set_focus()
+    search_box.type_keys("^a{DELETE}")
+    search_box.type_keys("Event Ticket", with_spaces=True)
+    search_btn.click_input()
+    time.sleep(2.0)
+
+    target = None
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for element in trade_window.descendants():
+            try:
+                aid = element.element_info.automation_id or ""
+            except Exception:
+                continue
+            if aid.startswith("Event Ticket_") and aid.endswith("_CardQuantityControl"):
+                target = element
+                break
+        if target is not None:
+            break
+        time.sleep(0.25)
+
+    if target is None:
+        return False
+
+    target.right_click_input()
+    time.sleep(1.0)
+
+    add_more = None
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        for element in trade_window.descendants():
+            try:
+                text = element.window_text()
+                control = element.friendly_class_name()
+            except Exception:
+                continue
+            if control == "MenuItem" and text.strip() == "Add More to Trade":
+                add_more = element
+                break
+        if add_more is not None:
+            break
+        time.sleep(0.25)
+
+    if add_more is None:
+        return False
+
+    add_more.click_input()
+    time.sleep(1.0)
+
+    edit = find_by_automation_id(trade_window, "CardQuantityIntegerUpDown")
+    if edit is None:
+        return False
+
+    edit.set_focus()
+    edit.set_edit_text(str(quantity))
+    edit.type_keys("{TAB}")
+    time.sleep(0.5)
+
+    if edit.window_text() != str(quantity):
+        # MTGO capped the value to what's actually available — cancel
+        # this dialog rather than committing a short amount.
+        cancel_btn = find_by_automation_id(trade_window, "CancelButton")
+        if cancel_btn is not None:
+            cancel_btn.invoke()
+        return False
+
+    ok_btn = find_by_automation_id(trade_window, "OkButton")
+    if ok_btn is None:
+        return False
+
+    ok_btn.invoke()
+    time.sleep(1.5)
+    return True
+
+
 def add_card_from_partner_binder(
         trade_window,
         card_name: str,
@@ -1260,6 +1361,24 @@ def submit_trade(trade_window) -> None:
             time.sleep(1.5)
             return
     raise MtgoAutomationError("Submit button not found in trade window")
+
+
+def cancel_trade(trade_window) -> None:
+    """Click Cancel Trade — confirmed live 2026-07-29: `click_input()`
+    didn't register on this button (same class of issue as
+    `submit_trade`), `invoke()` did. Closes the trade window entirely;
+    nothing staged on either side transfers."""
+    for element in trade_window.descendants():
+        try:
+            text = element.window_text()
+            control = element.friendly_class_name()
+        except Exception:
+            continue
+        if text.strip() == "Cancel Trade" and control == "Button":
+            element.invoke()
+            time.sleep(1.5)
+            return
+    raise MtgoAutomationError("Cancel Trade button not found in trade window")
 
 
 def wait_for_confirm_trade_button(trade_window, timeout: float = 300.0, interval: float = 5.0):

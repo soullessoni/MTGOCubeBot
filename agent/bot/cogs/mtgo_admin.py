@@ -169,6 +169,69 @@ class MtgoAdminCog(commands.Cog):
         )
         self._track_task(self._poll_and_report(interaction, job))
 
+    async def _notify_affected_players(self, job: dict) -> None:
+        """DM each player whose give didn't fully go through — either
+        it failed outright (e.g. an insufficient ticket deposit
+        cancelled the whole trade) or they didn't pick up everything
+        offered — so they're not left wondering why nothing showed up
+        on their MTGO account."""
+        if job["job_type"] != "GIVE":
+            return
+
+        result = job.get("result") or {}
+        failed = result.get("failed") or {}
+        not_taken = result.get("not_taken") or {}
+
+        affected = set(failed) | set(not_taken)
+        if not affected:
+            return
+
+        session_id = job.get("session_id")
+        if session_id is None:
+            return
+
+        try:
+            session = await self.api_client.get_session(session_id)
+        except CubeBotApiError as error:
+            logger.warning(
+                "Impossible de récupérer la session %s pour prévenir les joueurs : %s",
+                session_id, error.detail,
+            )
+            return
+
+        discord_ids_by_username = {
+            assignment["mtgo_username"]: assignment["discord_user_id"]
+            for assignment in session.get("assignments", [])
+            if assignment.get("mtgo_username") and assignment.get("discord_user_id")
+        }
+
+        for mtgo_username in affected:
+            discord_id = discord_ids_by_username.get(mtgo_username)
+            if discord_id is None:
+                continue
+
+            if mtgo_username in failed:
+                message = (
+                    f"⚠️ Ta distribution pour la session {session_id} n'a pas pu être "
+                    f"complétée : {failed[mtgo_username]}. L'admin va relancer une fois "
+                    f"le souci réglé."
+                )
+            else:
+                message = (
+                    f"Pour la session {session_id}, tu n'as pas récupéré toutes les "
+                    f"cartes proposées ({not_taken[mtgo_username]}) — vérifie ton "
+                    f"échange MTGO, l'admin en a été informé."
+                )
+
+            try:
+                user = await self.bot.fetch_user(int(discord_id))
+                await user.send(message)
+            except Exception:
+                logger.exception(
+                    "Impossible d'envoyer un MP à %s (discord_id=%s)",
+                    mtgo_username, discord_id,
+                )
+
     async def _poll_and_report(
             self,
             interaction: discord.Interaction,
@@ -205,6 +268,9 @@ class MtgoAdminCog(commands.Cog):
             message = "Terminé avec succès."
         else:
             message = f"Toujours en cours après {POLL_MAX_ATTEMPTS * POLL_INTERVAL_SECONDS}s (statut : {job['status']}) — utilisez /mtgo-job-status pour vérifier plus tard."
+
+        if job["status"] in TERMINAL_JOB_STATUSES:
+            await self._notify_affected_players(job)
 
         await interaction.followup.send(
             f"Job #{job['id']} ({job['job_type']}) — {message}",

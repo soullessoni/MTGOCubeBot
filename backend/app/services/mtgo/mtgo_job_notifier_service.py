@@ -15,6 +15,14 @@ def _format_card_counts(counts: dict) -> str:
     )
 
 
+def _format_nested_card_counts(nested: dict) -> str:
+    return "; ".join(
+        f"{player} ({_format_card_counts(counts)})"
+        for player, counts in nested.items()
+        if counts
+    )
+
+
 def build_notification_message(job: MtgoJob) -> str | None:
     """Pure function deciding whether `job`'s terminal state warrants
     proactively alerting an admin, and if so, what to say. Returns
@@ -29,6 +37,17 @@ def build_notification_message(job: MtgoJob) -> str | None:
 
     if job.status != "SUCCEEDED" or not isinstance(job.result, dict):
         return None
+
+    if job.job_type == "GIVE":
+        not_taken = job.result.get("not_taken") or {}
+
+        if not not_taken:
+            return None
+
+        return (
+            f"⚠️ Job #{job.id} (GIVE, session {job.session_id}) terminé avec un écart — "
+            f"non récupéré par le joueur : {_format_nested_card_counts(not_taken)}"
+        )
 
     if job.job_type == "RETURN":
         reconciliation = job.result.get("reconciliation") or {}

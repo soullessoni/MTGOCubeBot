@@ -76,3 +76,37 @@ def test_ignores_non_json_lines_and_finds_json_further_up_if_trailing_line_is_bl
 
     assert status == "SUCCEEDED"
     assert result == {"ok": True, "value": 42}
+
+
+def test_nonzero_exit_with_per_player_failed_dict_keeps_structured_result():
+    # prepare_session_binders.py's shape: no top-level "error" string,
+    # just a per-player "failed" dict — this must not be discarded in
+    # favor of a raw log tail, or a Discord-bot-side consumer has no
+    # way to know which player's give failed.
+    result_payload = {
+        "ok": False,
+        "given": {},
+        "not_taken": {},
+        "deposits_collected": {},
+        "failed": {"FruitDuChene": "Could only pull 2/5 deposit ticket(s)"},
+        "skipped_no_username": [],
+    }
+    stdout = "some log line\n" + json.dumps(result_payload)
+
+    status, result, error_message = parse_job_output(1, stdout)
+
+    assert status == "FAILED"
+    assert result == result_payload
+    assert "FruitDuChene" in error_message
+    assert "Could only pull 2/5 deposit ticket(s)" in error_message
+
+
+def test_nonzero_exit_with_ok_false_and_no_failed_dict_still_keeps_result():
+    result_payload = {"ok": False}
+    stdout = json.dumps(result_payload)
+
+    status, result, error_message = parse_job_output(1, stdout)
+
+    assert status == "FAILED"
+    assert result == result_payload
+    assert error_message is not None

@@ -10,6 +10,16 @@ from app.models.mtgo_job import MtgoJob
 from app.services.mtgo.mtgo_job_notifier_service import MtgoJobNotifierService
 
 
+def _summarize_parsed_failure(parsed: dict) -> str:
+    """Build a short error_message from structured output that reports
+    a failure without a single top-level "error" string — e.g.
+    prepare_session_binders.py's per-player "failed" dict."""
+    failed = parsed.get("failed")
+    if isinstance(failed, dict) and failed:
+        return "; ".join(f"{who}: {why}" for who, why in failed.items())
+    return "job reported failure without a specific error message"
+
+
 def parse_job_output(exit_code: int, stdout: str) -> tuple[str, dict | None, str | None]:
     """Find the last line of `stdout` that parses as JSON — that's the
     script's structured final result, by convention (see mtgo_job
@@ -17,7 +27,10 @@ def parse_job_output(exit_code: int, stdout: str) -> tuple[str, dict | None, str
     even if the JSON's own "ok" field is False — that field describes a
     reported domain discrepancy (still_owed, missing cards, ...), not a
     process failure. Anything else is FAILED, with the JSON's "error"
-    field or a tail of the raw output as the error message."""
+    field (or, failing that, a summary derived from whatever structured
+    output there is) as the error message — falling back to a tail of
+    the raw output only when there's no parseable JSON at all, so a
+    per-player failure dict is never silently discarded."""
     lines = [line for line in stdout.splitlines() if line.strip()]
 
     parsed = None
@@ -33,6 +46,9 @@ def parse_job_output(exit_code: int, stdout: str) -> tuple[str, dict | None, str
 
     if parsed is not None and isinstance(parsed.get("error"), str):
         return "FAILED", parsed, parsed["error"]
+
+    if parsed is not None:
+        return "FAILED", parsed, _summarize_parsed_failure(parsed)
 
     if lines:
         tail = "\n".join(lines[-40:])
