@@ -96,6 +96,23 @@ def _mark_returned(assignment_id: int) -> None:
     response.raise_for_status()
 
 
+def _fetch_deposit_for_player(session_id: int, mtgo_username: str) -> dict | None:
+    response = httpx.get(f"{BACKEND_API_URL}/loan/sessions/{session_id}/deposits")
+    response.raise_for_status()
+    for deposit in response.json():
+        if deposit["mtgo_username"] == mtgo_username:
+            return deposit
+    return None
+
+
+def _record_deposit_returned(deposit_id: int, returned_amount: int) -> None:
+    response = httpx.patch(
+        f"{BACKEND_API_URL}/loan/sessions/deposits/{deposit_id}/returned",
+        json={"returned_amount": returned_amount},
+    )
+    response.raise_for_status()
+
+
 def main():
     enable_utf8_stdout()
 
@@ -225,11 +242,36 @@ def main():
         if to_give_back:
             print(f"  [ADMIN ACTION NEEDED] received extra copies not owed — give back: {to_give_back}")
 
+        # The deposit (if any) travels back in this same trade — the
+        # player picks their tickets back from the bot's exposed Full
+        # Trade List exactly like they picked cards at give time, so no
+        # extra automation is needed here beyond confirming via the same
+        # before/after diff already taken for the cards.
+        deposit_result = None
+        deposit = _fetch_deposit_for_player(session_id, mtgo_username)
+        if deposit is not None and deposit.get("collected_amount") is not None:
+            ticket_change = after_qty.get("Event Ticket", 0) - before_qty.get("Event Ticket", 0)
+            deposit_returned = max(0, -ticket_change)
+            _record_deposit_returned(deposit["id"], deposit_returned)
+
+            deposit_still_owed = max(0, deposit["collected_amount"] - deposit_returned)
+            deposit_result = {
+                "collected_amount": deposit["collected_amount"],
+                "returned_amount": deposit_returned,
+                "still_owed": deposit_still_owed,
+            }
+            if deposit_still_owed:
+                print(
+                    f"  [ADMIN ACTION NEEDED] deposit not fully returned: "
+                    f"{deposit_returned}/{deposit['collected_amount']} ticket(s)"
+                )
+
         print_result({
-            "ok": not still_owed and not to_give_back,
+            "ok": not still_owed and not to_give_back and (deposit_result is None or not deposit_result["still_owed"]),
             "returned_count": returned_count,
             "reconciliation": {"still_owed": dict(still_owed), "to_give_back": to_give_back},
             "assignment_ids_returned": returned_assignment_ids,
+            "deposit": deposit_result,
         })
         return 0
     except Exception as error:

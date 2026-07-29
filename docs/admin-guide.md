@@ -60,8 +60,8 @@ Le panneau qui déclenche les vraies actions sur le client MTGO du bot.
 
 | Action | Ce qu'elle fait |
 |---|---|
-| Déclencher la distribution | Crée le binder MTGO d'une session avec les cartes `PREPARED` de chaque joueur identifié, puis lui envoie une vraie demande d'échange l'exposant. Le joueur accepte et pioche ce qu'il veut via Search Tools ; le bot soumet et confirme son propre côté (vide) une fois que le joueur a fini. Ce qui a réellement quitté le compte du bot est ensuite vérifié par export/diff, jamais en se fiant à la fenêtre d'échange en direct. |
-| Déclencher la récupération | Envoie une demande d'échange au joueur MTGO indiqué, attend qu'il accepte, puis récupère toutes ses cartes `CONFIRMED` pour cette session. |
+| Déclencher la distribution | Crée le binder MTGO d'une session avec les cartes `PREPARED` de chaque joueur identifié, puis lui envoie une vraie demande d'échange l'exposant. Le joueur accepte et pioche ce qu'il veut via Search Tools ; le bot soumet et confirme son propre côté (vide, sauf caution — voir ci-dessous) une fois que le joueur a fini. Ce qui a réellement quitté le compte du bot est ensuite vérifié par export/diff, jamais en se fiant à la fenêtre d'échange en direct. |
+| Déclencher la récupération | Envoie une demande d'échange au joueur MTGO indiqué, attend qu'il accepte, puis récupère toutes ses cartes `CONFIRMED` pour cette session (et rend sa caution si la session en a une). |
 | Vérifier l'intégrité du cube | Compare la collection réelle du bot sur MTGO à l'inventaire de référence (en tenant compte de ce qui est actuellement en prêt), et remonte tout écart. Action en lecture seule, sans risque. |
 
 **Tableau des jobs récents** : se met à jour automatiquement toutes les
@@ -89,6 +89,38 @@ pendant qu'il tourne, puis une fois terminé :
   d'action de rattrapage automatique proposée (un écart d'intégrité a
   besoin d'un examen humain).
 
+### Caution (dépôt de tickets)
+
+Une session peut exiger de chaque joueur un dépôt de tickets MTGO en
+échange des cartes, rendu intégralement au retour — utile pour
+dissuader la non-restitution. Se configure par session, pas encore
+depuis le dashboard (à faire manuellement via l'API pour l'instant) :
+
+```
+PATCH /loan/sessions/{id}/deposit-settings
+{"deposit_required": true, "deposit_amount": 10}
+```
+
+Le montant est le même pour tous les joueurs de la session. Une fois
+activé :
+
+- **Au don** : le bot prélève le montant exact directement dans la
+  collection du joueur (les tickets MTGO sont un objet interne nommé
+  "Event Ticket", visible sous l'onglet "Other Products" du client).
+  Si le joueur n'a pas assez de tickets disponibles au moment de
+  l'échange, le bot ne soumet/confirme rien — l'échange reste ouvert et
+  **aucune carte ne change de main** (MTGO ne transfère rien tant que
+  les deux côtés n'ont pas confirmé). Le job de distribution remonte
+  alors une erreur ; à l'admin de relancer une fois le joueur en mesure
+  de payer.
+- **Au retour** : le joueur reprend ses tickets lui-même via Search
+  Tools, exactement comme il a pioché ses cartes au don — aucune action
+  MTGO supplémentaire n'est déclenchée par le bot pour ça. Le job de
+  récupération vérifie via le même export/diff que le compte exact a
+  bien été restitué, et remonte un écart le cas échéant (`deposit` dans
+  le résultat du job : `collected_amount` / `returned_amount` /
+  `still_owed`).
+
 ## Le bot Discord
 
 ### Côté joueur
@@ -108,6 +140,13 @@ pendant qu'il tourne, puis une fois terminé :
 4. Un bouton **Corriger mon pseudo MTGO** reste disponible si le joueur
    s'est trompé — le soumettre relie à nouveau ses cartes et renvoie
    une liste fraîche.
+
+Si la session exige une caution, le joueur doit avoir les tickets
+demandés disponibles sur son compte MTGO au moment où l'admin déclenche
+la distribution (le bot les prélève pendant le même échange que les
+cartes) — à communiquer à l'avance, ce n'est annoncé nulle part dans
+Discord pour l'instant. Il les récupère lui-même au retour, comme pour
+les cartes.
 
 Les salons de session sont supprimés automatiquement une fois la
 session `COMPLETED` ou `CANCELLED` (vérifié toutes les

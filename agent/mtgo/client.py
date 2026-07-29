@@ -711,6 +711,46 @@ def request_trade_with_binder(window, buddy_name: str, binder_name: str) -> None
     time.sleep(1.0)
 
 
+def select_other_products_tickets_filter(window) -> None:
+    """Switch the item-category filter to "Other Products" and enable
+    the "Tickets" checkbox — confirmed live 2026-07-29: MTGO tickets
+    are internally an item named "Event Ticket" with CatID "1", using
+    the exact same CardQuantityControl mechanism as real cards, just
+    filed under this separate category tab rather than "Cards". Needed
+    before `add_card_from_partner_binder(window, "Event Ticket", catid="1")`
+    can find anything."""
+    tab = find_by_automation_id(window, "FilterTab-Other")
+    if tab is None:
+        raise MtgoAutomationError("'Other Products' filter tab not found")
+    tab.click_input()
+    time.sleep(1.0)
+
+    checkbox = find_by_automation_id(window, "FilterCards-OptionTickets")
+    if checkbox is None:
+        raise MtgoAutomationError("'Tickets' filter checkbox not found")
+    try:
+        already_checked = checkbox.get_toggle_state() == 1
+    except Exception:
+        already_checked = False
+    if not already_checked:
+        checkbox.click_input()
+        time.sleep(1.0)
+
+
+def select_cards_filter(window) -> None:
+    """Switch the item-category filter back to "Cards" — confirmed live
+    2026-07-29: leaving "Other Products" active breaks
+    `export_full_trade_list`'s "Full Trade List" binder-row lookup on
+    the main Collection screen afterward (the filter tab appears to be
+    shared account-wide state, not scoped to whichever window set it),
+    so this must be called before relying on that lookup again."""
+    tab = find_by_automation_id(window, "FilterTab-Cards")
+    if tab is None:
+        raise MtgoAutomationError("'Cards' filter tab not found")
+    tab.click_input()
+    time.sleep(1.0)
+
+
 def add_card_from_partner_binder(
         trade_window,
         card_name: str,

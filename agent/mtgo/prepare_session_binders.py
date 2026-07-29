@@ -43,6 +43,7 @@ import httpx
 from mtgo.catid_map import load_default_catid_map
 from mtgo.cli_common import BACKEND_API_URL, enable_utf8_stdout, fetch_session, print_result
 from mtgo.client import (
+    add_card_from_partner_binder,
     confirm_trade,
     create_binder_from_cards,
     dismiss_added_to_collection_popup,
@@ -51,6 +52,8 @@ from mtgo.client import (
     find_by_automation_id,
     find_mtgo_window,
     request_trade_with_binder,
+    select_cards_filter,
+    select_other_products_tickets_filter,
     submit_trade,
     wait_for_confirm_trade_button,
     wait_for_receiving_panel_to_settle,
@@ -91,6 +94,23 @@ def _record_given_quantity(assignment_id: int, given_quantity: int) -> None:
     response.raise_for_status()
 
 
+def _create_deposit(session_id: int, mtgo_username: str) -> dict:
+    response = httpx.post(
+        f"{BACKEND_API_URL}/loan/sessions/{session_id}/deposits",
+        json={"mtgo_username": mtgo_username},
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def _record_deposit_collected(deposit_id: int, collected_amount: int) -> None:
+    response = httpx.patch(
+        f"{BACKEND_API_URL}/loan/sessions/deposits/{deposit_id}/collected",
+        json={"collected_amount": collected_amount},
+    )
+    response.raise_for_status()
+
+
 def _go_to_collection(window) -> None:
     window.set_focus()
     collection_btn = find_by_automation_id(window, "CollectionButton")
@@ -104,13 +124,24 @@ def _complete_give_trade(
         mtgo_username: str,
         binder_name: str,
         assignments: list[dict],
+        deposit_amount: int | None = None,
 ) -> dict:
     """Expose `binder_name` to `mtgo_username` via a real trade, let
-    them pick what they want, complete the trade from the bot's side,
-    then confirm exactly what left the account via export diff. Returns
-    `{"given": {...}, "not_taken": {...}}` (see `compute_give_confirmation`).
+    them pick what they want, optionally pull a ticket deposit from
+    their own collection, complete the trade from the bot's side, then
+    confirm exactly what moved via export diff. Returns
+    `{"given": {...}, "not_taken": {...}, "ticket_collected": int}`
+    (see `compute_give_confirmation`).
+
+    If `deposit_amount` is set and the full amount can't be pulled from
+    the player's collection, this raises *before* submitting — MTGO
+    only moves anything once both sides confirm, so leaving the trade
+    unsubmitted is an all-or-nothing cancellation with no separate
+    "cancel trade" click needed (none was found/verified live).
+
     Raises on any step that doesn't complete (acceptance timeout, no
-    Confirm Trade button, or any underlying MtgoAutomationError)."""
+    Confirm Trade button, insufficient deposit, or any underlying
+    MtgoAutomationError)."""
     card_names = [a["card_name"] for a in assignments]
 
     _go_to_collection(window)
@@ -125,6 +156,27 @@ def _complete_give_trade(
     if trade_window is None:
         raise RuntimeError(f"{mtgo_username!r} did not accept the trade request within the timeout.")
 
+    if deposit_amount:
+        # Tickets are internally an item named "Event Ticket" (CatID
+        # "1") under the "Other Products" filter tab, using the exact
+        # same CardQuantityControl mechanism as cards — confirmed live
+        # 2026-07-29 — so the bot pulls them from the player's own
+        # collection exactly like process_session_returns.py pulls
+        # cards back.
+        select_other_products_tickets_filter(trade_window)
+        collected = 0
+        for _ in range(deposit_amount):
+            if add_card_from_partner_binder(trade_window, "Event Ticket", catid="1", timeout=15.0):
+                collected += 1
+        select_cards_filter(trade_window)
+
+        if collected < deposit_amount:
+            raise RuntimeError(
+                f"Could only pull {collected}/{deposit_amount} deposit ticket(s) from "
+                f"{mtgo_username!r}'s collection — leaving the trade unconfirmed, nothing transfers."
+            )
+        print(f"Pulled {collected}/{deposit_amount} deposit ticket(s) from {mtgo_username!r}.")
+
     # Confirmed live 2026-07-27: submitting immediately (before the
     # player has picked anything) risks the bot's submit being silently
     # invalidated once the player's side later changes — MTGO's Confirm
@@ -132,11 +184,11 @@ def _complete_give_trade(
     # their picks to actually settle first.
     wait_for_receiving_panel_to_settle(trade_window, mtgo_username, timeout=300.0, stable_for=3.0)
 
-    # Nothing to add on the bot's own side — it's a pure give — but
-    # both sides must submit before Confirm Trade appears (confirmed
-    # live, see submit_trade's docstring).
+    # Both sides must submit before Confirm Trade appears, even one
+    # that only added nothing or only deposit tickets on its own side
+    # (see submit_trade's docstring).
     submit_trade(trade_window)
-    print("Bot submitted (nothing to add on our side).")
+    print("Bot submitted.")
 
     if not wait_for_confirm_trade_button(trade_window, timeout=60.0):
         # The player may have kept adding cards after our submit,
@@ -158,7 +210,10 @@ def _complete_give_trade(
         export_full_trade_list(window, Path(f"mtgo/lists/_give_after_{mtgo_username}.dek"))
     )
 
-    return compute_give_confirmation(before_qty, after_qty, card_names)
+    confirmation = compute_give_confirmation(before_qty, after_qty, card_names)
+    confirmation["ticket_collected"] = after_qty.get("Event Ticket", 0) - before_qty.get("Event Ticket", 0)
+
+    return confirmation
 
 
 def main():
@@ -175,9 +230,18 @@ def main():
         session = fetch_session(session_id)
         by_player, skipped = _group_prepared_assignments_by_player(session)
 
+        deposit_amount = session.get("deposit_amount") if session.get("deposit_required") else None
+
         if not by_player:
             print(f"No PREPARED assignments with an mtgo_username found for session {session_id}.")
-            print_result({"ok": True, "given": {}, "not_taken": {}, "failed": {}, "skipped_no_username": skipped})
+            print_result({
+                "ok": True,
+                "given": {},
+                "not_taken": {},
+                "deposits_collected": {},
+                "failed": {},
+                "skipped_no_username": skipped,
+            })
             return 0
 
         # Target the bot's own account explicitly rather than "whichever
@@ -202,6 +266,7 @@ def main():
 
         given: dict[str, dict[str, int]] = {}
         not_taken: dict[str, dict[str, int]] = {}
+        deposits_collected: dict[str, int] = {}
         failed: dict[str, str] = {}
 
         for mtgo_username, assignments in by_player.items():
@@ -212,7 +277,13 @@ def main():
                 label = create_binder_from_cards(window, binder_name, card_names, catid_map=catid_map)
                 print(f"{mtgo_username}: {label} ({len(card_names)} cards)")
 
-                confirmation = _complete_give_trade(window, mtgo_username, binder_name, assignments)
+                deposit_record = None
+                if deposit_amount:
+                    deposit_record = _create_deposit(session_id, mtgo_username)
+
+                confirmation = _complete_give_trade(
+                    window, mtgo_username, binder_name, assignments, deposit_amount=deposit_amount,
+                )
 
                 by_name: dict[str, list[dict]] = {}
                 for assignment in assignments:
@@ -229,6 +300,10 @@ def main():
                 if confirmation["not_taken"]:
                     not_taken[mtgo_username] = confirmation["not_taken"]
                     print(f"  [INFO] {mtgo_username!r} did not pick up: {confirmation['not_taken']}")
+
+                if deposit_record is not None:
+                    _record_deposit_collected(deposit_record["id"], confirmation["ticket_collected"])
+                    deposits_collected[mtgo_username] = confirmation["ticket_collected"]
             except Exception as error:
                 print(f"{mtgo_username}: FAILED — {error}")
                 failed[mtgo_username] = str(error)
@@ -237,6 +312,7 @@ def main():
             "ok": not failed and not not_taken,
             "given": given,
             "not_taken": not_taken,
+            "deposits_collected": deposits_collected,
             "failed": failed,
             "skipped_no_username": skipped,
         })

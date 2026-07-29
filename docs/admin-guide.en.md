@@ -59,8 +59,8 @@ The panel that triggers real actions on the bot's MTGO client.
 
 | Action | What it does |
 |---|---|
-| Trigger give | Creates a session's MTGO binder with each identified player's `PREPARED` cards, then sends them a real trade request exposing it. The player accepts and picks whatever they want via Search Tools; the bot submits and confirms its own (empty) side once they're done. What actually left the bot's account is then verified via export/diff, never by trusting the live trade window. |
-| Trigger return | Sends a trade request to the given MTGO player, waits for them to accept, then retrieves all of their `CONFIRMED` cards for that session. |
+| Trigger give | Creates a session's MTGO binder with each identified player's `PREPARED` cards, then sends them a real trade request exposing it. The player accepts and picks whatever they want via Search Tools; the bot submits and confirms its own side (empty, unless a deposit is required — see below) once they're done. What actually left the bot's account is then verified via export/diff, never by trusting the live trade window. |
+| Trigger return | Sends a trade request to the given MTGO player, waits for them to accept, then retrieves all of their `CONFIRMED` cards for that session (and returns their deposit, if the session has one). |
 | Check cube integrity | Compares the bot's real MTGO collection against the reference inventory (accounting for what's currently on loan) and reports any discrepancy. Read-only, no risk. |
 
 **Recent jobs table**: refreshes automatically every 5 seconds. Each
@@ -87,6 +87,36 @@ then once finished:
   versus the reference — no automated corrective action is offered (an
   integrity discrepancy needs a human look).
 
+### Deposit (ticket caution)
+
+A session can require every player to deposit MTGO tickets in exchange
+for the cards, returned in full when they come back — useful as a
+disincentive against not returning a loan. Configured per session, not
+yet from the dashboard (do it via the API for now):
+
+```
+PATCH /loan/sessions/{id}/deposit-settings
+{"deposit_required": true, "deposit_amount": 10}
+```
+
+The amount is flat across every player in the session. Once enabled:
+
+- **At give time**: the bot pulls the exact amount straight from the
+  player's own collection (MTGO tickets are an internal item named
+  "Event Ticket", listed under the client's "Other Products" tab). If
+  the player doesn't have enough tickets available at trade time, the
+  bot doesn't submit/confirm anything — the trade stays open and **no
+  cards change hands** (MTGO never moves anything until both sides
+  confirm). The give job reports an error; the admin retries once the
+  player can actually pay.
+- **At return time**: the player picks their tickets back themselves
+  via Search Tools, exactly like they picked their cards at give time —
+  the bot doesn't trigger any extra MTGO action for this. The return
+  job verifies the exact amount came back via the same export/diff
+  already used for the cards, and reports a shortfall if not
+  (`deposit` in the job result: `collected_amount` / `returned_amount`
+  / `still_owed`).
+
 ## The Discord bot
 
 ### Player side
@@ -108,6 +138,12 @@ then once finished:
 4. A **Corriger mon pseudo MTGO** (Fix my MTGO username) button stays
    available if the player made a typo — resubmitting re-links their
    cards and resends a fresh list.
+
+If the session requires a deposit, the player needs the requested
+tickets available on their MTGO account by the time the admin triggers
+the give (the bot pulls them during that same trade) — communicate this
+ahead of time, since nothing in Discord announces it yet. They pick
+them back up themselves at return time, same as the cards.
 
 Session channels are automatically deleted once the session is
 `COMPLETED` or `CANCELLED` (checked every `CLEANUP_INTERVAL_MINUTES`).
