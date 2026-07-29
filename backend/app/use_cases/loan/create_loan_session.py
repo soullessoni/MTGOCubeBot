@@ -2,6 +2,7 @@ from sqlalchemy.orm import Session
 
 from app.models.loan_assignment import LoanAssignment
 from app.models.loan_session import LoanSession
+from app.services.loan.deposit_validation import validate_deposit_settings
 
 
 class CreateLoanSessionUseCase:
@@ -15,10 +16,19 @@ class CreateLoanSessionUseCase:
     def execute(
         self,
         plan,
+        deposit_required: bool = False,
+        deposit_amount: int | None = None,
     ) -> LoanSession:
+
+        deposit_amount = validate_deposit_settings(
+            deposit_required,
+            deposit_amount,
+        )
 
         session = LoanSession(
             status="CREATED",
+            deposit_required=deposit_required,
+            deposit_amount=deposit_amount,
         )
 
         for request in plan:

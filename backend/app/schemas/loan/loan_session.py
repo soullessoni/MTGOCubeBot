@@ -18,14 +18,23 @@ class PlayerLoanRequest(BaseModel):
 
 class LoanSessionCreate(BaseModel):
     players: list[PlayerLoanRequest]
+    deposit_required: bool = False
+    deposit_amount: int | None = None
 
 
 class LoanSessionResponse(BaseModel):
     id: int
     status: str
     created_at: datetime
+    deposit_required: bool
+    deposit_amount: int | None = None
     assignments: list[LoanAssignmentResponse]
 
     model_config = {
         "from_attributes": True,
     }
+
+
+class SetDepositSettingsRequest(BaseModel):
+    deposit_required: bool
+    deposit_amount: int | None = None

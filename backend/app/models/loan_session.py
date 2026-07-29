@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -27,8 +27,28 @@ class LoanSession(Base):
         default=lambda: datetime.now(UTC),
     )
 
+    # Whether every player in this session must deposit tickets as
+    # collateral before receiving cards (see LoanDeposit) — a flat
+    # per-player amount, not a total for the whole session.
+    deposit_required = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+    )
+
+    deposit_amount = Column(
+        Integer,
+        nullable=True,
+    )
+
     assignments = relationship(
         "LoanAssignment",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+
+    deposits = relationship(
+        "LoanDeposit",
         back_populates="session",
         cascade="all, delete-orphan",
     )

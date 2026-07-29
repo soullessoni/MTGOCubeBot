@@ -73,6 +73,14 @@ def create_loan_session(
         db,
     )
 
-    return use_case.execute(
-        planning_result.requests,
-    )
+    try:
+        return use_case.execute(
+            planning_result.requests,
+            deposit_required=payload.deposit_required,
+            deposit_amount=payload.deposit_amount,
+        )
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
