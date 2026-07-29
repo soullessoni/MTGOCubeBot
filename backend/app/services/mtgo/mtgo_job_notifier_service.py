@@ -30,10 +30,22 @@ def build_notification_message(job: MtgoJob) -> str | None:
     shape this function doesn't recognize) so the caller can treat
     `None` as "do nothing"."""
     if job.status == "FAILED":
-        return (
+        message = (
             f"⚠️ Job #{job.id} ({job.job_type}) a échoué : "
             f"{job.error_message or 'erreur inconnue'}"
         )
+
+        # A GIVE can fail for one player (e.g. an insufficient deposit
+        # cancelling their trade) while another player in the same job
+        # succeeded but didn't pick up everything offered — that
+        # discrepancy would otherwise never surface here, since a
+        # non-empty "failed" dict already exits the script non-zero.
+        if job.job_type == "GIVE" and isinstance(job.result, dict):
+            not_taken = job.result.get("not_taken") or {}
+            if not_taken:
+                message += f" — non récupéré par ailleurs : {_format_nested_card_counts(not_taken)}"
+
+        return message
 
     if job.status != "SUCCEEDED" or not isinstance(job.result, dict):
         return None

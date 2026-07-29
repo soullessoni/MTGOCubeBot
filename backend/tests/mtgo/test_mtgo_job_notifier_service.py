@@ -138,6 +138,29 @@ def test_succeeded_integrity_check_clean_returns_none():
     assert message is None
 
 
+def test_failed_give_also_mentions_not_taken_for_other_players():
+    job = _make_job(
+        job_type="GIVE",
+        status="FAILED",
+        error_message="FruitDuChene: could not pull deposit ticket(s)",
+        result={
+            "ok": False,
+            "given": {"Alice": {"Brainstorm": 1}},
+            "not_taken": {"Alice": {"Brainstorm": 1}},
+            "deposits_collected": {},
+            "failed": {"FruitDuChene": "could not pull deposit ticket(s)"},
+            "skipped_no_username": [],
+        },
+    )
+
+    message = build_notification_message(job)
+
+    assert message is not None
+    assert "FruitDuChene" in message
+    assert "Alice" in message
+    assert "Brainstorm" in message
+
+
 def test_succeeded_give_returns_none():
     job = _make_job(
         job_type="GIVE",

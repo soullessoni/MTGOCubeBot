@@ -17,6 +17,21 @@ class LoanDepositService:
                 "This session does not require a deposit"
             )
 
+        existing = (
+            self.db.query(LoanDeposit)
+            .filter(
+                LoanDeposit.session_id == session.id,
+                LoanDeposit.mtgo_username == mtgo_username,
+            )
+            .first()
+        )
+        if existing is not None:
+            # A retried give job re-creates a deposit for the same
+            # player — reuse the existing row instead of creating a
+            # duplicate, or a later lookup by mtgo_username could pick
+            # the wrong (stale, uncollected) one.
+            return existing
+
         deposit = LoanDeposit(
             session_id=session.id,
             mtgo_username=mtgo_username,

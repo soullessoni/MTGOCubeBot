@@ -717,8 +717,8 @@ def select_other_products_tickets_filter(window) -> None:
     are internally an item named "Event Ticket" with CatID "1", using
     the exact same CardQuantityControl mechanism as real cards, just
     filed under this separate category tab rather than "Cards". Needed
-    before `add_card_from_partner_binder(window, "Event Ticket", catid="1")`
-    can find anything."""
+    before `add_tickets_to_trade`'s "Event Ticket" search can find
+    anything."""
     tab = find_by_automation_id(window, "FilterTab-Other")
     if tab is None:
         raise MtgoAutomationError("'Other Products' filter tab not found")
