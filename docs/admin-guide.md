@@ -25,6 +25,36 @@ une tâche de fond qui pilote le client MTGO du bot en temps réel
 joueur accepte l'échange), suivie via son statut (`PENDING` → `RUNNING`
 → `SUCCEEDED` / `FAILED`).
 
+## Créer une session de prêt
+
+Pas d'interface dédiée dans le dashboard pour l'instant — uniquement via
+l'API, deux façons :
+
+**À partir de noms de cartes** (le plus simple à écrire à la main) :
+
+```
+POST /loan/sessions/from-draft
+{"players": [{"player_name": "Alice", "cards": ["Brainstorm", "Wingcrafter"]}, {"player_name": "Bob", "cards": ["Lightning Bolt"]}]}
+```
+
+Résout chaque nom via l'inventaire (`/inventory/`) ; répond 404 si une
+carte n'existe pas dans le cube. Ne permet pas de fixer la caution à la
+création — utiliser `PATCH .../deposit-settings` (voir plus bas) juste
+après si besoin.
+
+**Par `card_id`** (permet de fixer la caution dès la création) :
+
+```
+POST /loan/sessions/
+{"players": [{"player_name": "Alice", "cards": [{"card_id": 2, "quantity": 1}]}], "deposit_required": true, "deposit_amount": 10}
+```
+
+Les `card_id` viennent de `GET /inventory/`. Répond 409 si la quantité
+demandée dépasse le stock disponible.
+
+Les deux renvoient la session créée ; son `id` sert de `session_id` pour
+toute la suite (dashboard, commandes Discord).
+
 ## Le dashboard
 
 Accessible à `http://<serveur>:8000/dashboard/`.
@@ -240,6 +270,42 @@ Un vrai `.exe` compilé n'apporte rien ici (aucune logique ne le
 justifie, juste des lancements de process dans l'ordre) et ajoute un
 risque réel de faux positif antivirus pour un exécutable maison non
 signé — le `.bat` + raccourci donne le même confort au quotidien.
+
+### Arrêt propre
+
+Pas de script dédié pour l'instant — arrêt manuel :
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Select-Object ProcessId, ParentProcessId, CommandLine
+```
+
+Repérer les process backend (`uvicorn app.main:app`) et bot (`bot.main`)
+dans la colonne `CommandLine`, puis pour chacun :
+
+```powershell
+Stop-Process -Id <pid> -Force
+```
+
+**Piège à connaître** : sur cette installation Python 3.14, chaque
+process tourne en **paire** — un stub qui relance l'interpréteur réel
+comme processus enfant (même `CommandLine` pour les deux ;
+`ParentProcessId` de l'un pointe vers l'autre). Tuer un seul des deux
+peut soit laisser l'autre en zombie sans libérer le port, soit faire
+disparaître tout le process logique en ne visant que l'un des deux —
+dans tous les cas, arrêter systématiquement **les deux PID de chaque
+paire**, jamais un seul isolément.
+
+Si les tâches planifiées (section suivante) sont actives, elles
+relanceront automatiquement backend/bot après un `Stop-Process` — les
+désactiver d'abord si l'arrêt doit être durable plutôt qu'un simple
+redémarrage :
+
+```powershell
+Disable-ScheduledTask -TaskName "MTGOCubeBot-Backend"
+Disable-ScheduledTask -TaskName "MTGOCubeBot-DiscordBot"
+```
+
+(`Enable-ScheduledTask` avec les mêmes noms pour les réactiver ensuite.)
 
 ### Supervision des process (démarrage auto + redémarrage)
 

@@ -24,6 +24,35 @@ seconds to a few minutes, however long it takes a player to accept the
 trade), tracked via its status (`PENDING` → `RUNNING` →
 `SUCCEEDED` / `FAILED`).
 
+## Creating a loan session
+
+No dedicated dashboard interface for this yet — API only, two ways:
+
+**From card names** (the simplest to write by hand):
+
+```
+POST /loan/sessions/from-draft
+{"players": [{"player_name": "Alice", "cards": ["Brainstorm", "Wingcrafter"]}, {"player_name": "Bob", "cards": ["Lightning Bolt"]}]}
+```
+
+Resolves each name against the inventory (`/inventory/`); returns 404 if
+a card doesn't exist in the cube. Doesn't let you set a deposit at
+creation time — use `PATCH .../deposit-settings` (see below) right
+after if needed.
+
+**By `card_id`** (lets you set the deposit at creation time):
+
+```
+POST /loan/sessions/
+{"players": [{"player_name": "Alice", "cards": [{"card_id": 2, "quantity": 1}]}], "deposit_required": true, "deposit_amount": 10}
+```
+
+`card_id` values come from `GET /inventory/`. Returns 409 if the
+requested quantity exceeds available stock.
+
+Both return the created session; its `id` is the `session_id` used for
+everything that follows (dashboard, Discord commands).
+
 ## The dashboard
 
 Available at `http://<server>:8000/dashboard/`.
@@ -236,6 +265,40 @@ would benefit from compilation, just ordered process launches), and it
 adds a real risk of an antivirus false positive for an unsigned
 homebrew executable — the `.bat` + shortcut gives the same day-to-day
 convenience.
+
+### Clean shutdown
+
+No dedicated script for this yet — manual stop:
+
+```powershell
+Get-CimInstance Win32_Process -Filter "Name='python.exe'" | Select-Object ProcessId, ParentProcessId, CommandLine
+```
+
+Spot the backend (`uvicorn app.main:app`) and bot (`bot.main`)
+processes in the `CommandLine` column, then for each:
+
+```powershell
+Stop-Process -Id <pid> -Force
+```
+
+**Known gotcha**: on this Python 3.14 install, every process runs as a
+**pair** — a stub that relaunches the real interpreter as a child
+process (same `CommandLine` for both; one's `ParentProcessId` points at
+the other). Killing only one of the two can either leave the other as
+a zombie without freeing the port, or kill the whole logical process
+while only targeting one — either way, always stop **both PIDs of each
+pair**, never just one.
+
+If the scheduled tasks (next section) are active, they'll automatically
+restart the backend/bot after a `Stop-Process` — disable them first if
+the shutdown needs to stick rather than just trigger a restart:
+
+```powershell
+Disable-ScheduledTask -TaskName "MTGOCubeBot-Backend"
+Disable-ScheduledTask -TaskName "MTGOCubeBot-DiscordBot"
+```
+
+(`Enable-ScheduledTask` with the same names to turn them back on later.)
 
 ### Process supervision (auto-start + auto-restart)
 
