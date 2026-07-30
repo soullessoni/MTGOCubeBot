@@ -38,13 +38,19 @@ de création. Le lien "Voir" ouvre le détail d'une session.
 
 - Le statut de la session et un bouton d'action correspondant à l'étape
   courante (marquer prête, démarrer, compléter).
+- **Préparer tout** — visible tant que la session est `IN_PROGRESS` et
+  qu'au moins une carte est encore `CREATED` ; passe en une fois toutes
+  les cartes `CREATED` à `PREPARED`, sans avoir à cliquer ligne par
+  ligne.
 - **Forcer l'arrêt** — annule la session ; toute carte non retournée
   est libérée dans l'inventaire. Irréversible, demande confirmation.
 - Le tableau des cartes assignées, avec pour chacune un bouton
   correspondant à son statut (préparer, distribuer, confirmer, marquer
   retournée). Ce sont des actions manuelles côté suivi — elles ne
   déclenchent aucune action MTGO réelle (voir la page Administration
-  MTGO pour ça).
+  MTGO pour ça). En pratique, le bouton "distribuer" ne sert que de
+  rattrapage manuel : le job de distribution (voir ci-dessous) passe
+  déjà chaque carte réellement donnée à `DISTRIBUTED` tout seul.
 
 ### Inventaire (`inventory.html`)
 
@@ -60,7 +66,7 @@ Le panneau qui déclenche les vraies actions sur le client MTGO du bot.
 
 | Action | Ce qu'elle fait |
 |---|---|
-| Déclencher la distribution | Crée le binder MTGO d'une session avec les cartes `PREPARED` de chaque joueur identifié, puis lui envoie une vraie demande d'échange l'exposant. Le joueur accepte et pioche ce qu'il veut via Search Tools ; le bot soumet et confirme son propre côté (vide, sauf caution — voir ci-dessous) une fois que le joueur a fini. Ce qui a réellement quitté le compte du bot est ensuite vérifié par export/diff, jamais en se fiant à la fenêtre d'échange en direct. |
+| Déclencher la distribution | Crée le binder MTGO d'une session avec les cartes `PREPARED` de chaque joueur identifié, puis lui envoie une vraie demande d'échange l'exposant. Le joueur accepte et pioche ce qu'il veut via Search Tools ; le bot soumet et confirme son propre côté (vide, sauf caution — voir ci-dessous) une fois que le joueur a fini. Ce qui a réellement quitté le compte du bot est ensuite vérifié par export/diff, jamais en se fiant à la fenêtre d'échange en direct. Chaque carte confirmée comme donnée (même si le joueur n'a pas tout pris) passe automatiquement `PREPARED` → `DISTRIBUTED`, et le joueur reçoit aussitôt un MP avec le bouton "J'ai reçu ces cartes" — pas besoin qu'il rouvre "Corriger mon pseudo MTGO" pour l'obtenir. |
 | Déclencher la récupération | Envoie une demande d'échange au joueur MTGO indiqué, attend qu'il accepte, puis récupère toutes ses cartes `CONFIRMED` pour cette session (et rend sa caution si la session en a une). |
 | Vérifier l'intégrité du cube | Compare la collection réelle du bot sur MTGO à l'inventaire de référence (en tenant compte de ce qui est actuellement en prêt), et remonte tout écart. Action en lecture seule, sans risque. |
 

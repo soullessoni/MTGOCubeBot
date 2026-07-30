@@ -95,6 +95,13 @@ def _record_given_quantity(assignment_id: int, given_quantity: int) -> None:
     response.raise_for_status()
 
 
+def _distribute_assignment(assignment_id: int) -> None:
+    response = httpx.post(
+        f"{BACKEND_API_URL}/loan/sessions/assignments/{assignment_id}/distribute",
+    )
+    response.raise_for_status()
+
+
 def _create_deposit(session_id: int, mtgo_username: str) -> dict:
     response = httpx.post(
         f"{BACKEND_API_URL}/loan/sessions/{session_id}/deposits",
@@ -241,6 +248,7 @@ def main():
                 "ok": True,
                 "given": {},
                 "not_taken": {},
+                "distributed": {},
                 "deposits_collected": {},
                 "failed": {},
                 "skipped_no_username": skipped,
@@ -269,6 +277,7 @@ def main():
 
         given: dict[str, dict[str, int]] = {}
         not_taken: dict[str, dict[str, int]] = {}
+        distributed: dict[str, list[int]] = {}
         deposits_collected: dict[str, int] = {}
         failed: dict[str, str] = {}
 
@@ -299,6 +308,17 @@ def main():
                         _record_given_quantity(assignment["id"], take)
                         remaining_given -= take
 
+                        # A card that actually left the account is
+                        # distributed to the player right away — even
+                        # if the rest of their pool wasn't (not_taken),
+                        # they can still confirm what they did get —
+                        # instead of leaving every assignment at
+                        # PREPARED for an admin to click "Distribuer"
+                        # one by one.
+                        if take > 0:
+                            _distribute_assignment(assignment["id"])
+                            distributed.setdefault(mtgo_username, []).append(assignment["id"])
+
                 given[mtgo_username] = confirmation["given"]
                 if confirmation["not_taken"]:
                     not_taken[mtgo_username] = confirmation["not_taken"]
@@ -315,6 +335,7 @@ def main():
             "ok": not failed and not not_taken,
             "given": given,
             "not_taken": not_taken,
+            "distributed": distributed,
             "deposits_collected": deposits_collected,
             "failed": failed,
             "skipped_no_username": skipped,

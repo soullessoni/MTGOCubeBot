@@ -193,6 +193,24 @@ function renderSessionActions(session) {
         container.appendChild(button);
     }
 
+    if (session.status === "IN_PROGRESS" && session.assignments.some((a) => a.status === "CREATED")) {
+        const prepareAllButton = document.createElement("button");
+        prepareAllButton.textContent = "Préparer tout";
+
+        prepareAllButton.addEventListener("click", async () => {
+            clearError();
+
+            try {
+                await apiPost(`${API_BASE}/${session.id}/prepare-all`);
+                await renderSessionDetail();
+            } catch (err) {
+                showError(err.message);
+            }
+        });
+
+        container.appendChild(prepareAllButton);
+    }
+
     if (CANCELLABLE_STATUSES.includes(session.status)) {
         const cancelButton = document.createElement("button");
         cancelButton.textContent = "Forcer l'arrêt";

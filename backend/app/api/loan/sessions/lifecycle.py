@@ -19,6 +19,9 @@ from app.use_cases.loan.force_cancel_loan_session import (
 from app.use_cases.loan.mark_ready_loan_session import (
     MarkReadyLoanSessionUseCase,
 )
+from app.use_cases.loan.prepare_all_loan_assignments import (
+    PrepareAllLoanAssignmentsUseCase,
+)
 from app.use_cases.loan.start_loan_session import (
     StartLoanSessionUseCase,
 )
@@ -101,6 +104,51 @@ def start_loan_session(
     )
 
     use_case = StartLoanSessionUseCase(
+        workflow,
+    )
+
+    try:
+        return use_case.execute(
+            session,
+        )
+
+    except ValueError as error:
+        raise HTTPException(
+            status_code=400,
+            detail=str(error),
+        )
+
+
+@router.post(
+    "/{session_id}/prepare-all",
+    response_model=LoanSessionResponse,
+)
+def prepare_all_loan_assignments(
+        session_id: int,
+        db: Session = Depends(get_db),
+):
+    session = (
+        db.query(LoanSession)
+        .options(
+            selectinload(LoanSession.assignments)
+        )
+        .filter(
+            LoanSession.id == session_id
+        )
+        .first()
+    )
+
+    if session is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Loan session not found",
+        )
+
+    workflow = LoanSessionWorkflowService(
+        db,
+    )
+
+    use_case = PrepareAllLoanAssignmentsUseCase(
         workflow,
     )
 

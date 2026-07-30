@@ -209,6 +209,117 @@ def test_prepare_is_persisted(db_session):
     )
 
 
+def test_prepare_all_assignments_prepares_only_created_ones(db_session):
+    card = Card(
+        name="Black Lotus",
+    )
+
+    session = LoanSession(
+        status="IN_PROGRESS",
+    )
+
+    created_one = LoanAssignment(
+        card=card,
+        status="CREATED",
+        player_name="Alice",
+        quantity=1,
+    )
+    created_two = LoanAssignment(
+        card=card,
+        status="CREATED",
+        player_name="Bob",
+        quantity=1,
+    )
+    already_prepared = LoanAssignment(
+        card=card,
+        status="PREPARED",
+        player_name="Carol",
+        quantity=1,
+    )
+    cancelled = LoanAssignment(
+        card=card,
+        status="CANCELLED",
+        player_name="Dave",
+        quantity=1,
+    )
+
+    session.assignments.extend(
+        [created_one, created_two, already_prepared, cancelled]
+    )
+
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanSessionWorkflowService(
+        db_session,
+    )
+
+    service.prepare_all_assignments(session)
+
+    assert created_one.status == "PREPARED"
+    assert created_two.status == "PREPARED"
+    assert already_prepared.status == "PREPARED"
+    assert cancelled.status == "CANCELLED"
+
+
+def test_prepare_all_assignments_commits_once_regardless_of_count(db_session):
+    session = LoanSession(
+        status="IN_PROGRESS",
+    )
+
+    card = Card(
+        name="Black Lotus",
+    )
+
+    for i in range(10):
+        session.assignments.append(
+            LoanAssignment(
+                card=card,
+                status="CREATED",
+                player_name=f"Player {i}",
+                quantity=1,
+            )
+        )
+
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanSessionWorkflowService(
+        db_session,
+    )
+
+    commit_count = 0
+
+    def _count_commit(session_):
+        nonlocal commit_count
+        commit_count += 1
+
+    event.listen(db_session, "after_commit", _count_commit)
+    try:
+        service.prepare_all_assignments(session)
+    finally:
+        event.remove(db_session, "after_commit", _count_commit)
+
+    assert commit_count == 1
+    assert all(assignment.status == "PREPARED" for assignment in session.assignments)
+
+
+def test_cannot_prepare_all_when_session_not_in_progress(db_session):
+    session = LoanSession(
+        status="READY",
+    )
+
+    db_session.add(session)
+    db_session.commit()
+
+    service = LoanSessionWorkflowService(
+        db_session,
+    )
+
+    with pytest.raises(ValueError):
+        service.prepare_all_assignments(session)
+
+
 def test_complete_only_when_returned(db_session):
     session = LoanSession(
         status="IN_PROGRESS",

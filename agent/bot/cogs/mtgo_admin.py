@@ -7,6 +7,7 @@ from discord.ext import commands
 
 from bot.api_client import CubeBotApiClient, CubeBotApiError
 from bot.checks import is_admin, user_is_admin
+from bot.cogs.session_flow import AssignmentActionView, _format_assignment_line
 
 logger = logging.getLogger(__name__)
 
@@ -232,6 +233,69 @@ class MtgoAdminCog(commands.Cog):
                     mtgo_username, discord_id,
                 )
 
+    async def _notify_distributed_players(self, job: dict) -> None:
+        """DM each player whose assignments this GIVE job just moved to
+        DISTRIBUTED, with the same "J'ai reçu ces cartes" prompt
+        `SessionFlowCog.complete_identification` sends at identification
+        time — so a player gets it right away instead of having to
+        reopen "Corriger mon pseudo MTGO" to trigger a fresh one. Fires
+        even for a partial pool (some cards not_taken) — the player can
+        confirm what they did receive."""
+        if job["job_type"] != "GIVE":
+            return
+
+        result = job.get("result") or {}
+        distributed = result.get("distributed") or {}
+        if not distributed:
+            return
+
+        session_id = job.get("session_id")
+        if session_id is None:
+            return
+
+        try:
+            session = await self.api_client.get_session(session_id)
+        except CubeBotApiError as error:
+            logger.warning(
+                "Impossible de récupérer la session %s pour notifier la distribution : %s",
+                session_id, error.detail,
+            )
+            return
+
+        assignments_by_id = {
+            assignment["id"]: assignment
+            for assignment in session.get("assignments", [])
+        }
+        session_flow_cog = self.bot.get_cog("SessionFlowCog")
+
+        for mtgo_username, assignment_ids in distributed.items():
+            group = [
+                assignments_by_id[assignment_id]
+                for assignment_id in assignment_ids
+                if assignment_id in assignments_by_id
+                and assignments_by_id[assignment_id]["status"] == "DISTRIBUTED"
+            ]
+            if not group:
+                continue
+
+            discord_id = group[0].get("discord_user_id")
+            if discord_id is None:
+                continue
+
+            try:
+                user = await self.bot.fetch_user(int(discord_id))
+                await user.send(
+                    f"Tes cartes de la session {session_id} sont prêtes — "
+                    f"confirme leur réception ci-dessous :\n"
+                    + "\n".join(_format_assignment_line(a) for a in group),
+                    view=AssignmentActionView(session_flow_cog, group),
+                )
+            except Exception:
+                logger.exception(
+                    "Impossible d'envoyer le MP de distribution à %s (discord_id=%s)",
+                    mtgo_username, discord_id,
+                )
+
     async def _poll_and_report(
             self,
             interaction: discord.Interaction,
@@ -271,6 +335,7 @@ class MtgoAdminCog(commands.Cog):
 
         if job["status"] in TERMINAL_JOB_STATUSES:
             await self._notify_affected_players(job)
+            await self._notify_distributed_players(job)
 
         await interaction.followup.send(
             f"Job #{job['id']} ({job['job_type']}) — {message}",

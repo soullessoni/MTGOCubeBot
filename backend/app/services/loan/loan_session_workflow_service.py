@@ -48,6 +48,34 @@ class LoanSessionWorkflowService:
             assignment,
         )
 
+    def prepare_all_assignments(
+            self,
+            session: LoanSession,
+    ) -> list[LoanAssignment]:
+
+        if session.status != "IN_PROGRESS":
+            raise ValueError(
+                "Session must be IN_PROGRESS"
+            )
+
+        prepared = [
+            assignment
+            for assignment in session.assignments
+            if assignment.status == "CREATED"
+        ]
+
+        for assignment in prepared:
+            self.assignment_service.status_service.mark_prepared(
+                assignment,
+            )
+
+        self.db.commit()
+
+        for assignment in prepared:
+            self.db.refresh(assignment)
+
+        return prepared
+
     def distribute_assignment(
             self,
             assignment: LoanAssignment,

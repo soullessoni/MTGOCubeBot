@@ -37,13 +37,19 @@ Lists every loan session: ID, status, card count, creation date. The
 
 - The session's status and an action button matching the current step
   (mark ready, start, complete).
+- **Préparer tout** (Prepare all) — shown while the session is
+  `IN_PROGRESS` and at least one card is still `CREATED`; moves every
+  `CREATED` card to `PREPARED` in one call instead of clicking each
+  row individually.
 - **Forcer l'arrêt** (Force stop) — cancels the session; any
   not-yet-returned card is released back into inventory. Irreversible,
   asks for confirmation.
 - The assigned-cards table, with a button per card matching its status
   (prepare, distribute, confirm, mark returned). These are manual
   tracking actions — they don't trigger any real MTGO action (see the
-  MTGO Administration page for that).
+  MTGO Administration page for that). In practice the "distribute"
+  button is only a manual fallback: the give job below already moves
+  each actually-given card to `DISTRIBUTED` on its own.
 
 ### Inventory (`inventory.html`)
 
@@ -59,7 +65,7 @@ The panel that triggers real actions on the bot's MTGO client.
 
 | Action | What it does |
 |---|---|
-| Trigger give | Creates a session's MTGO binder with each identified player's `PREPARED` cards, then sends them a real trade request exposing it. The player accepts and picks whatever they want via Search Tools; the bot submits and confirms its own side (empty, unless a deposit is required — see below) once they're done. What actually left the bot's account is then verified via export/diff, never by trusting the live trade window. |
+| Trigger give | Creates a session's MTGO binder with each identified player's `PREPARED` cards, then sends them a real trade request exposing it. The player accepts and picks whatever they want via Search Tools; the bot submits and confirms its own side (empty, unless a deposit is required — see below) once they're done. What actually left the bot's account is then verified via export/diff, never by trusting the live trade window. Every card confirmed as given (even if the player didn't take everything) automatically moves `PREPARED` → `DISTRIBUTED`, and the player is immediately DMed the "J'ai reçu ces cartes" button — no need to reopen "Corriger mon pseudo MTGO" to get one. |
 | Trigger return | Sends a trade request to the given MTGO player, waits for them to accept, then retrieves all of their `CONFIRMED` cards for that session (and returns their deposit, if the session has one). |
 | Check cube integrity | Compares the bot's real MTGO collection against the reference inventory (accounting for what's currently on loan) and reports any discrepancy. Read-only, no risk. |
 
