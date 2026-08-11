@@ -1,4 +1,3 @@
-from app.models.cube import Cube
 from app.services.mtgo.mtgo_account_service import MtgoAccountService
 
 
@@ -10,23 +9,7 @@ def test_create_account(db_session):
     assert account.id is not None
     assert account.name == "TheLegionCube"
     assert account.mtgo_username == "TheLegionCube"
-    assert account.cube_id is None
     assert account.active is True
-
-
-def test_create_account_with_cube(db_session):
-    cube = Cube(
-        name="Vintage Cube",
-        cubecobra_url="https://cubecobra.com/cube/overview/vintage",
-    )
-    db_session.add(cube)
-    db_session.commit()
-
-    service = MtgoAccountService(db_session)
-
-    account = service.create("TheLegionCube", "TheLegionCube", cube_id=cube.id)
-
-    assert account.cube_id == cube.id
 
 
 def test_get_returns_none_for_missing_account(db_session):

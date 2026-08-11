@@ -13,12 +13,10 @@ class MtgoAccountService:
             self,
             name: str,
             mtgo_username: str,
-            cube_id: int | None = None,
     ) -> MtgoAccount:
         account = MtgoAccount(
             name=name,
             mtgo_username=mtgo_username,
-            cube_id=cube_id,
         )
 
         self.db.add(account)
