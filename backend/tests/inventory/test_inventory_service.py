@@ -2,7 +2,7 @@ from app.models.card import Card
 from app.services.inventory.inventory_service import InventoryService
 
 
-def test_set_inventory_quantity(db_session):
+def test_set_inventory_quantity(db_session, cube_instance_id):
     card = Card(name="Black Lotus")
 
     db_session.add(card)
@@ -10,14 +10,14 @@ def test_set_inventory_quantity(db_session):
 
     service = InventoryService(db_session)
 
-    service.set_quantity(card, 2)
+    service.set_quantity(card, cube_instance_id, 2)
 
-    quantity = service.get_quantity(card)
+    quantity = service.get_quantity(card, cube_instance_id)
 
     assert quantity == 2
 
 
-def test_unknown_card_returns_zero(db_session):
+def test_unknown_card_returns_zero(db_session, cube_instance_id):
     card = Card(name="Does Not Exist")
 
     db_session.add(card)
@@ -25,10 +25,10 @@ def test_unknown_card_returns_zero(db_session):
 
     service = InventoryService(db_session)
 
-    assert service.get_quantity(card) == 0
+    assert service.get_quantity(card, cube_instance_id) == 0
 
 
-def test_create_inventory_for_existing_card(db_session):
+def test_create_inventory_for_existing_card(db_session, cube_instance_id):
     card = Card(name="Unknown Card")
 
     db_session.add(card)
@@ -36,12 +36,12 @@ def test_create_inventory_for_existing_card(db_session):
 
     service = InventoryService(db_session)
 
-    service.set_quantity(card, 1)
+    service.set_quantity(card, cube_instance_id, 1)
 
-    assert service.get_quantity(card) == 1
+    assert service.get_quantity(card, cube_instance_id) == 1
 
 
-def test_list_all_returns_every_item(db_session):
+def test_list_all_returns_every_item(db_session, cube_instance_id):
     lotus = Card(name="Black Lotus")
     bolt = Card(name="Lightning Bolt")
 
@@ -51,8 +51,8 @@ def test_list_all_returns_every_item(db_session):
 
     service = InventoryService(db_session)
 
-    service.set_quantity(lotus, 1)
-    service.set_quantity(bolt, 4)
+    service.set_quantity(lotus, cube_instance_id, 1)
+    service.set_quantity(bolt, cube_instance_id, 4)
 
     items = service.list_all()
 

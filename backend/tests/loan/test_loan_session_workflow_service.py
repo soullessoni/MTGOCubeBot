@@ -9,9 +9,10 @@ from app.services.loan.loan_session_workflow_service import (
 )
 
 
-def test_start_ready_session(db_session):
+def test_start_ready_session(db_session, cube_instance_id):
     session = LoanSession(
         status="READY",
+        cube_instance_id=cube_instance_id,
     )
 
     db_session.add(session)
@@ -26,9 +27,10 @@ def test_start_ready_session(db_session):
     assert session.status == "IN_PROGRESS"
 
 
-def test_cannot_start_created_session(db_session):
+def test_cannot_start_created_session(db_session, cube_instance_id):
     session = LoanSession(
         status="CREATED",
+        cube_instance_id=cube_instance_id,
     )
 
     db_session.add(session)
@@ -42,13 +44,14 @@ def test_cannot_start_created_session(db_session):
         service.start(session)
 
 
-def test_prepare_assignment(db_session):
+def test_prepare_assignment(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
@@ -74,13 +77,14 @@ def test_prepare_assignment(db_session):
     assert assignment.status == "PREPARED"
 
 
-def test_cannot_prepare_when_session_not_in_progress(db_session):
+def test_cannot_prepare_when_session_not_in_progress(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="READY",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
@@ -105,13 +109,14 @@ def test_cannot_prepare_when_session_not_in_progress(db_session):
         service.prepare_assignment(assignment)
 
 
-def test_distribute_assignment(db_session):
+def test_distribute_assignment(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
@@ -137,13 +142,14 @@ def test_distribute_assignment(db_session):
     assert assignment.status == "DISTRIBUTED"
 
 
-def test_confirm_assignment(db_session):
+def test_confirm_assignment(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
@@ -169,13 +175,14 @@ def test_confirm_assignment(db_session):
     assert assignment.status == "CONFIRMED"
 
 
-def test_prepare_is_persisted(db_session):
+def test_prepare_is_persisted(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     session.assignments.append(
@@ -209,13 +216,14 @@ def test_prepare_is_persisted(db_session):
     )
 
 
-def test_prepare_all_assignments_prepares_only_created_ones(db_session):
+def test_prepare_all_assignments_prepares_only_created_ones(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     created_one = LoanAssignment(
@@ -262,9 +270,10 @@ def test_prepare_all_assignments_prepares_only_created_ones(db_session):
     assert cancelled.status == "CANCELLED"
 
 
-def test_prepare_all_assignments_commits_once_regardless_of_count(db_session):
+def test_prepare_all_assignments_commits_once_regardless_of_count(db_session, cube_instance_id):
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     card = Card(
@@ -304,9 +313,10 @@ def test_prepare_all_assignments_commits_once_regardless_of_count(db_session):
     assert all(assignment.status == "PREPARED" for assignment in session.assignments)
 
 
-def test_cannot_prepare_all_when_session_not_in_progress(db_session):
+def test_cannot_prepare_all_when_session_not_in_progress(db_session, cube_instance_id):
     session = LoanSession(
         status="READY",
+        cube_instance_id=cube_instance_id,
     )
 
     db_session.add(session)
@@ -320,9 +330,10 @@ def test_cannot_prepare_all_when_session_not_in_progress(db_session):
         service.prepare_all_assignments(session)
 
 
-def test_complete_only_when_returned(db_session):
+def test_complete_only_when_returned(db_session, cube_instance_id):
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     db_session.add(session)
@@ -351,9 +362,10 @@ def test_complete_only_when_returned(db_session):
     assert session.status == "COMPLETED"
 
 
-def test_cannot_complete_with_missing_return(db_session):
+def test_cannot_complete_with_missing_return(db_session, cube_instance_id):
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     db_session.add(session)
@@ -381,13 +393,14 @@ def test_cannot_complete_with_missing_return(db_session):
         service.complete(session)
 
 
-def test_return_card(db_session):
+def test_return_card(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
@@ -415,13 +428,14 @@ def test_return_card(db_session):
     assert assignment.status == "RETURNED"
 
 
-def test_cannot_return_created_card(db_session):
+def test_cannot_return_created_card(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
@@ -448,13 +462,14 @@ def test_cannot_return_created_card(db_session):
         )
 
 
-def test_cannot_return_twice(db_session):
+def test_cannot_return_twice(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
@@ -481,13 +496,14 @@ def test_cannot_return_twice(db_session):
         )
 
 
-def test_force_cancel_cancels_session_and_active_assignments(db_session):
+def test_force_cancel_cancels_session_and_active_assignments(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     prepared_assignment = LoanAssignment(
@@ -521,9 +537,10 @@ def test_force_cancel_cancels_session_and_active_assignments(db_session):
     assert returned_assignment.status == "RETURNED"
 
 
-def test_force_cancel_commits_once_regardless_of_assignment_count(db_session):
+def test_force_cancel_commits_once_regardless_of_assignment_count(db_session, cube_instance_id):
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     card = Card(
@@ -563,9 +580,10 @@ def test_force_cancel_commits_once_regardless_of_assignment_count(db_session):
     assert all(assignment.status == "CANCELLED" for assignment in session.assignments)
 
 
-def test_cannot_force_cancel_completed_session(db_session):
+def test_cannot_force_cancel_completed_session(db_session, cube_instance_id):
     session = LoanSession(
         status="COMPLETED",
+        cube_instance_id=cube_instance_id,
     )
 
     db_session.add(session)

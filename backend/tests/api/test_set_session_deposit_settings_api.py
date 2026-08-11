@@ -1,8 +1,8 @@
 from app.models.loan_session import LoanSession
 
 
-def test_set_deposit_settings_api(client, db_session):
-    session = LoanSession(status="CREATED")
+def test_set_deposit_settings_api(client, db_session, cube_instance_id):
+    session = LoanSession(status="CREATED", cube_instance_id=cube_instance_id)
     db_session.add(session)
     db_session.commit()
 
@@ -19,8 +19,8 @@ def test_set_deposit_settings_api(client, db_session):
     assert data["deposit_amount"] == 20
 
 
-def test_set_deposit_settings_rejects_missing_amount_api(client, db_session):
-    session = LoanSession(status="CREATED")
+def test_set_deposit_settings_rejects_missing_amount_api(client, db_session, cube_instance_id):
+    session = LoanSession(status="CREATED", cube_instance_id=cube_instance_id)
     db_session.add(session)
     db_session.commit()
 

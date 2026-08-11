@@ -9,13 +9,14 @@ from app.use_cases.loan.force_cancel_loan_session import (
 )
 
 
-def test_force_cancel_loan_session(db_session):
+def test_force_cancel_loan_session(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     session.assignments.append(

@@ -69,6 +69,7 @@ class LoanPlanningService:
     def generate(
         self,
         pools,
+        cube_instance_id,
     ) -> LoanPlanningResult:
 
         requests = []
@@ -119,6 +120,7 @@ class LoanPlanningService:
 
             available = self.inventory_service.get_available_quantity(
                 card,
+                cube_instance_id,
             )
 
             required = len(players)

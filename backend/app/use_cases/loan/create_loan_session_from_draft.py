@@ -27,7 +27,9 @@ class CreateLoanSessionFromDraftUseCase:
     def execute(
         self,
         players: list[dict],
+        cube_instance_id: int,
     ):
         return self.generator.create_from_draft(
             players,
+            cube_instance_id,
         )

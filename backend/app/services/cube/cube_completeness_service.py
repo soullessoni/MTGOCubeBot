@@ -32,13 +32,15 @@ class CubeCompletenessService:
     def check(
             self,
             cube: Cube,
+            cube_instance_id: int,
     ) -> CubeCheckResult:
 
         missing_cards = []
 
         for cube_card in cube.cards:
             available = self.inventory.get_quantity(
-                cube_card.card
+                cube_card.card,
+                cube_instance_id,
             )
 
             required = cube_card.quantity

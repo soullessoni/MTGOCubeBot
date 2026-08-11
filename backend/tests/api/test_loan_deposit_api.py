@@ -2,9 +2,10 @@ from app.models.loan_deposit import LoanDeposit
 from app.models.loan_session import LoanSession
 
 
-def _make_deposit_session(db_session, deposit_amount=10):
+def _make_deposit_session(db_session, cube_instance_id, deposit_amount=10):
     session = LoanSession(
         status="CREATED",
+        cube_instance_id=cube_instance_id,
         deposit_required=True,
         deposit_amount=deposit_amount,
     )
@@ -14,8 +15,8 @@ def _make_deposit_session(db_session, deposit_amount=10):
     return session
 
 
-def test_create_deposit_api(client, db_session):
-    session = _make_deposit_session(db_session)
+def test_create_deposit_api(client, db_session, cube_instance_id):
+    session = _make_deposit_session(db_session, cube_instance_id)
 
     response = client.post(
         f"/loan/sessions/{session.id}/deposits",
@@ -33,8 +34,8 @@ def test_create_deposit_api(client, db_session):
     assert data["returned_amount"] is None
 
 
-def test_create_deposit_rejects_session_without_deposit_required_api(client, db_session):
-    session = LoanSession(status="CREATED")
+def test_create_deposit_rejects_session_without_deposit_required_api(client, db_session, cube_instance_id):
+    session = LoanSession(status="CREATED", cube_instance_id=cube_instance_id)
     db_session.add(session)
     db_session.commit()
 
@@ -55,8 +56,8 @@ def test_create_deposit_unknown_session_api(client):
     assert response.status_code == 404
 
 
-def test_list_deposits_for_session_api(client, db_session):
-    session = _make_deposit_session(db_session)
+def test_list_deposits_for_session_api(client, db_session, cube_instance_id):
+    session = _make_deposit_session(db_session, cube_instance_id)
 
     client.post(
         f"/loan/sessions/{session.id}/deposits",
@@ -76,8 +77,8 @@ def test_list_deposits_for_session_api(client, db_session):
     assert usernames == {"Alice", "Bob"}
 
 
-def test_record_deposit_collected_api(client, db_session):
-    session = _make_deposit_session(db_session)
+def test_record_deposit_collected_api(client, db_session, cube_instance_id):
+    session = _make_deposit_session(db_session, cube_instance_id)
     deposit = LoanDeposit(
         session_id=session.id,
         mtgo_username="FruitDuChene",
@@ -105,8 +106,8 @@ def test_record_deposit_collected_unknown_deposit_api(client):
     assert response.status_code == 404
 
 
-def test_record_deposit_returned_api(client, db_session):
-    session = _make_deposit_session(db_session)
+def test_record_deposit_returned_api(client, db_session, cube_instance_id):
+    session = _make_deposit_session(db_session, cube_instance_id)
     deposit = LoanDeposit(
         session_id=session.id,
         mtgo_username="FruitDuChene",

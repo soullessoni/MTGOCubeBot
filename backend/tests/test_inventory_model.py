@@ -1,7 +1,7 @@
 from app.models import Card, InventoryItem
 
 
-def test_create_inventory_item(db_session):
+def test_create_inventory_item(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus"
     )
@@ -11,6 +11,7 @@ def test_create_inventory_item(db_session):
 
     inventory = InventoryItem(
         card_id=card.id,
+        cube_instance_id=cube_instance_id,
         quantity=1,
     )
 

@@ -16,7 +16,7 @@ class InventoryImportService:
         self.db = db
         self.inventory_service = InventoryService(db)
 
-    def import_quantities(self, quantities: dict[str, int]) -> dict:
+    def import_quantities(self, cube_instance_id: int, quantities: dict[str, int]) -> dict:
         existing_cards = {card.name: card for card in self.db.query(Card).all()}
         created_cards = []
         zeroed_names = []
@@ -31,14 +31,14 @@ class InventoryImportService:
                 existing_cards[name] = card
                 created_cards.append(name)
 
-            self.inventory_service._stage_quantity(card, quantity)
+            self.inventory_service._stage_quantity(card, cube_instance_id, quantity)
 
         for name, card in existing_cards.items():
             if name in quantities:
                 continue
 
-            if self.inventory_service.get_quantity(card) > 0:
-                self.inventory_service._stage_quantity(card, 0)
+            if self.inventory_service.get_quantity(card, cube_instance_id) > 0:
+                self.inventory_service._stage_quantity(card, cube_instance_id, 0)
                 zeroed_names.append(name)
 
         self.db.commit()

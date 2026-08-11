@@ -6,6 +6,7 @@ from app.models.loan_session import LoanSession
 def test_mark_ready_loan_session_api(
         client,
         db_session,
+        cube_instance_id,
 ):
     card = Card(
         name="Black Lotus",
@@ -13,6 +14,7 @@ def test_mark_ready_loan_session_api(
 
     session = LoanSession(
         status="CREATED",
+        cube_instance_id=cube_instance_id,
     )
 
     session.assignments.append(
@@ -42,9 +44,11 @@ def test_mark_ready_loan_session_api(
 def test_mark_ready_empty_session_fails(
         client,
         db_session,
+        cube_instance_id,
 ):
     session = LoanSession(
         status="CREATED",
+        cube_instance_id=cube_instance_id,
     )
 
     db_session.add(session)

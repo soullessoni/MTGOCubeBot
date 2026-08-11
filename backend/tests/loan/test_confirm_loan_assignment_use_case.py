@@ -9,7 +9,7 @@ from app.use_cases.loan.confirm_loan_assignment import (
 )
 
 
-def test_confirm_loan_assignment(db_session):
+def test_confirm_loan_assignment(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
@@ -23,6 +23,7 @@ def test_confirm_loan_assignment(db_session):
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     session.assignments.append(

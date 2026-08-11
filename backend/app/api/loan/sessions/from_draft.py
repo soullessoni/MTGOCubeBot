@@ -39,6 +39,7 @@ def create_from_draft(
                 player.model_dump()
                 for player in payload.players
             ],
+            cube_instance_id=payload.cube_instance_id,
         )
 
     except CardNotFoundError as error:

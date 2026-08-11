@@ -16,6 +16,7 @@ class CreateLoanSessionUseCase:
     def execute(
         self,
         plan,
+        cube_instance_id: int,
         deposit_required: bool = False,
         deposit_amount: int | None = None,
     ) -> LoanSession:
@@ -27,6 +28,7 @@ class CreateLoanSessionUseCase:
 
         session = LoanSession(
             status="CREATED",
+            cube_instance_id=cube_instance_id,
             deposit_required=deposit_required,
             deposit_amount=deposit_amount,
         )

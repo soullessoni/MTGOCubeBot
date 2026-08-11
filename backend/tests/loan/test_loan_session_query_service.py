@@ -8,13 +8,14 @@ from app.services.loan.loan_session_query_service import (
 )
 
 
-def test_get_loan_session(db_session):
+def test_get_loan_session(db_session, cube_instance_id):
     card = Card(
         name="Black Lotus",
     )
 
     session = LoanSession(
         status="CREATED",
+        cube_instance_id=cube_instance_id,
     )
 
     db_session.add(card)
@@ -59,13 +60,15 @@ def test_get_unknown_session_returns_none(db_session):
     assert result is None
 
 
-def test_list_all_sessions(db_session):
+def test_list_all_sessions(db_session, cube_instance_id):
     first_session = LoanSession(
         status="CREATED",
+        cube_instance_id=cube_instance_id,
     )
 
     second_session = LoanSession(
         status="READY",
+        cube_instance_id=cube_instance_id,
     )
 
     db_session.add(first_session)
@@ -97,10 +100,10 @@ def test_list_all_sessions_when_empty(db_session):
     assert result == []
 
 
-def test_list_all_does_not_query_card_names_one_by_one(db_session):
+def test_list_all_does_not_query_card_names_one_by_one(db_session, cube_instance_id):
     card_a = Card(name="Black Lotus")
     card_b = Card(name="Ancestral Recall")
-    session = LoanSession(status="CREATED")
+    session = LoanSession(status="CREATED", cube_instance_id=cube_instance_id)
 
     db_session.add_all([card_a, card_b, session])
     db_session.commit()

@@ -6,9 +6,10 @@ from app.services.loan.loan_assignment_service import (
 )
 
 
-def test_record_given_quantity_persists(db_session):
+def test_record_given_quantity_persists(db_session, cube_instance_id):
     session = LoanSession(
         status="CREATED",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(

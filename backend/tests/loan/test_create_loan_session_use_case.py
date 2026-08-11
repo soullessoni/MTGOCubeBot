@@ -9,7 +9,7 @@ from app.services.loan.loan_planning_service import (
 )
 
 
-def test_create_session_from_plan(db_session):
+def test_create_session_from_plan(db_session, cube_instance_id):
     lotus = Card(
         name="Black Lotus",
     )
@@ -41,7 +41,7 @@ def test_create_session_from_plan(db_session):
         db_session,
     )
 
-    session = service.execute(plan)
+    session = service.execute(plan, cube_instance_id)
 
     assert session.status == "CREATED"
     assert len(session.assignments) == 2
@@ -52,7 +52,7 @@ def test_create_session_from_plan(db_session):
     assert session.deposit_amount is None
 
 
-def test_create_session_with_deposit_required(db_session):
+def test_create_session_with_deposit_required(db_session, cube_instance_id):
     lotus = Card(name="Black Lotus")
 
     plan = LoanPlanningResult(
@@ -69,6 +69,7 @@ def test_create_session_with_deposit_required(db_session):
 
     session = service.execute(
         plan,
+        cube_instance_id,
         deposit_required=True,
         deposit_amount=10,
     )
@@ -77,7 +78,7 @@ def test_create_session_with_deposit_required(db_session):
     assert session.deposit_amount == 10
 
 
-def test_create_session_rejects_deposit_required_without_amount(db_session):
+def test_create_session_rejects_deposit_required_without_amount(db_session, cube_instance_id):
     lotus = Card(name="Black Lotus")
 
     plan = LoanPlanningResult(
@@ -95,6 +96,7 @@ def test_create_session_rejects_deposit_required_without_amount(db_session):
     with pytest.raises(ValueError):
         service.execute(
             plan,
+            cube_instance_id,
             deposit_required=True,
             deposit_amount=None,
         )

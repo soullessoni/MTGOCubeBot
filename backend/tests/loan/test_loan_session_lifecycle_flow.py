@@ -21,6 +21,7 @@ from app.services.loan.loan_session_workflow_service import (
 
 def test_loan_session_full_lifecycle(
     db_session,
+    cube_instance_id,
 ):
 
     cards = [
@@ -46,6 +47,7 @@ def test_loan_session_full_lifecycle(
                 ],
             }
         ],
+        cube_instance_id=cube_instance_id,
     )
 
     assert session.status == "CREATED"

@@ -4,11 +4,12 @@ from app.models.loan_session import LoanSession
 from app.services.loan.loan_deposit_service import LoanDepositService
 
 
-def test_create_deposit_uses_session_amount(db_session):
+def test_create_deposit_uses_session_amount(db_session, cube_instance_id):
     session = LoanSession(
         status="CREATED",
         deposit_required=True,
         deposit_amount=10,
+        cube_instance_id=cube_instance_id,
     )
     db_session.add(session)
     db_session.commit()
@@ -24,8 +25,8 @@ def test_create_deposit_uses_session_amount(db_session):
     assert deposit.returned_amount is None
 
 
-def test_create_deposit_rejects_session_without_deposit_required(db_session):
-    session = LoanSession(status="CREATED")
+def test_create_deposit_rejects_session_without_deposit_required(db_session, cube_instance_id):
+    session = LoanSession(status="CREATED", cube_instance_id=cube_instance_id)
     db_session.add(session)
     db_session.commit()
 
@@ -35,11 +36,12 @@ def test_create_deposit_rejects_session_without_deposit_required(db_session):
         service.create(session, "FruitDuChene")
 
 
-def test_record_collected_amount(db_session):
+def test_record_collected_amount(db_session, cube_instance_id):
     session = LoanSession(
         status="CREATED",
         deposit_required=True,
         deposit_amount=10,
+        cube_instance_id=cube_instance_id,
     )
     db_session.add(session)
     db_session.commit()
@@ -53,11 +55,12 @@ def test_record_collected_amount(db_session):
     assert result.returned_amount is None
 
 
-def test_record_returned_amount(db_session):
+def test_record_returned_amount(db_session, cube_instance_id):
     session = LoanSession(
         status="CREATED",
         deposit_required=True,
         deposit_amount=10,
+        cube_instance_id=cube_instance_id,
     )
     db_session.add(session)
     db_session.commit()
@@ -72,9 +75,13 @@ def test_record_returned_amount(db_session):
     assert result.returned_amount == 10
 
 
-def test_list_for_session_returns_only_that_sessions_deposits(db_session):
-    session_a = LoanSession(status="CREATED", deposit_required=True, deposit_amount=5)
-    session_b = LoanSession(status="CREATED", deposit_required=True, deposit_amount=5)
+def test_list_for_session_returns_only_that_sessions_deposits(db_session, cube_instance_id):
+    session_a = LoanSession(
+        status="CREATED", deposit_required=True, deposit_amount=5, cube_instance_id=cube_instance_id
+    )
+    session_b = LoanSession(
+        status="CREATED", deposit_required=True, deposit_amount=5, cube_instance_id=cube_instance_id
+    )
     db_session.add_all([session_a, session_b])
     db_session.commit()
 
@@ -94,7 +101,7 @@ def test_get_returns_none_for_missing_deposit(db_session):
     assert service.get(999) is None
 
 
-def test_create_is_idempotent_per_session_and_player(db_session):
+def test_create_is_idempotent_per_session_and_player(db_session, cube_instance_id):
     """A retried give job (e.g. after a failed trade) re-runs
     `_create_deposit` for the same player — it must reuse the existing
     row instead of creating a duplicate, or a later lookup by
@@ -103,6 +110,7 @@ def test_create_is_idempotent_per_session_and_player(db_session):
         status="CREATED",
         deposit_required=True,
         deposit_amount=10,
+        cube_instance_id=cube_instance_id,
     )
     db_session.add(session)
     db_session.commit()

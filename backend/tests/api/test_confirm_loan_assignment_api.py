@@ -6,6 +6,7 @@ from app.models.loan_session import LoanSession
 def test_confirm_loan_assignment_api(
         client,
         db_session,
+        cube_instance_id,
 ):
     card = Card(
         name="Black Lotus",
@@ -13,6 +14,7 @@ def test_confirm_loan_assignment_api(
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
@@ -44,6 +46,7 @@ def test_confirm_loan_assignment_api(
 def test_cannot_confirm_prepared_assignment(
         client,
         db_session,
+        cube_instance_id,
 ):
     card = Card(
         name="Black Lotus",
@@ -51,6 +54,7 @@ def test_cannot_confirm_prepared_assignment(
 
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(

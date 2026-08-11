@@ -10,12 +10,12 @@ class FakeInventoryService:
     def check_availability(self, card):
         return True
 
-    def get_available_quantity(self, card):
+    def get_available_quantity(self, card, cube_instance_id):
         return 99
 
 
 
-def test_generate_loan_requests():
+def test_generate_loan_requests(db_session, cube_instance_id):
 
     lotus = Card(
         name="Black Lotus",
@@ -35,7 +35,8 @@ def test_generate_loan_requests():
                 lotus,
                 bolt,
             ]
-        }
+        },
+        cube_instance_id,
     )
 
     assert len(result) == 2
@@ -47,7 +48,7 @@ def test_generate_loan_requests():
 
 
 
-def test_generate_multiple_players_requests():
+def test_generate_multiple_players_requests(db_session, cube_instance_id):
 
     lotus = Card(
         name="Black Lotus",
@@ -69,7 +70,8 @@ def test_generate_multiple_players_requests():
             "Bob": [
                 bolt,
             ],
-        }
+        },
+        cube_instance_id,
     )
 
     assert len(result) == 2
@@ -79,19 +81,19 @@ def test_generate_multiple_players_requests():
 
 
 
-def test_generate_empty_player_list():
+def test_generate_empty_player_list(db_session, cube_instance_id):
 
     service = LoanPlanningService(
         inventory_service=FakeInventoryService()
     )
 
-    result = service.generate({})
+    result = service.generate({}, cube_instance_id)
 
     assert result == []
 
 
 
-def test_generate_detects_duplicate_cards_conflict():
+def test_generate_detects_duplicate_cards_conflict(db_session, cube_instance_id):
 
     lotus = Card(
         name="Black Lotus",
@@ -109,7 +111,8 @@ def test_generate_detects_duplicate_cards_conflict():
             "Bob": [
                 lotus,
             ],
-        }
+        },
+        cube_instance_id,
     )
 
     assert len(result) == 2

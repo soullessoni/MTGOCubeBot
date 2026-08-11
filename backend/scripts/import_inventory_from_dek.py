@@ -5,10 +5,13 @@ card currently in inventory but absent from the export is zeroed out
 (stale/test data, e.g. leftover placeholder cards from development).
 
 Usage:
-  .venv/Scripts/python.exe scripts/import_inventory_from_dek.py <path-to-dek>
+  .venv/Scripts/python.exe scripts/import_inventory_from_dek.py <cube_instance_id> <path-to-dek>
 
 Typically run against agent/mtgo/lists/full_trade_list.dek (gitignored
-real collection data, not checked in).
+real collection data, not checked in). `cube_instance_id` identifies
+which account/cube-copy pool this export belongs to (see
+`GET /cube-instances/` — or the mtgo_accounts/cube_instances tables
+directly until that endpoint exists).
 """
 
 import sys
@@ -20,11 +23,12 @@ from app.services.inventory.inventory_import_service import InventoryImportServi
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: python scripts/import_inventory_from_dek.py <path-to-dek>")
+    if len(sys.argv) != 3:
+        print("Usage: python scripts/import_inventory_from_dek.py <cube_instance_id> <path-to-dek>")
         return 1
 
-    dek_path = Path(sys.argv[1])
+    cube_instance_id = int(sys.argv[1])
+    dek_path = Path(sys.argv[2])
 
     if not dek_path.exists():
         print(f"File not found: {dek_path}")
@@ -38,7 +42,7 @@ def main():
 
     try:
         service = InventoryImportService(db)
-        result = service.import_quantities(quantities)
+        result = service.import_quantities(cube_instance_id, quantities)
     finally:
         db.close()
 

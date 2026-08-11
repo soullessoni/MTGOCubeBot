@@ -308,14 +308,20 @@ async function renderInventory() {
     for (const item of items) {
         const row = document.createElement("tr");
         const cardLabel = item.card_name || `Carte #${item.card_id}`;
+        // A card can have one row per cube instance — the row/button pair
+        // is keyed on (card_id, cube_instance_id) together, not card_id
+        // alone, so saving one row's quantity never touches another
+        // instance's pool for the same card.
+        const rowKey = `${item.card_id}:${item.cube_instance_id}`;
 
         row.innerHTML = `
             <td>${cardLabel}</td>
+            <td>#${item.cube_instance_id}</td>
             <td>${item.quantity}</td>
             <td>${item.available_quantity}</td>
             <td>
-                <input type="number" min="0" value="${item.quantity}" data-card-id="${item.card_id}" class="quantity-input"/>
-                <button data-card-id="${item.card_id}" class="save-quantity-btn">Enregistrer</button>
+                <input type="number" min="0" value="${item.quantity}" data-row-key="${rowKey}" class="quantity-input"/>
+                <button data-card-id="${item.card_id}" data-cube-instance-id="${item.cube_instance_id}" data-row-key="${rowKey}" class="save-quantity-btn">Enregistrer</button>
             </td>
         `;
 
@@ -327,11 +333,13 @@ async function renderInventory() {
             clearError();
 
             const cardId = button.dataset.cardId;
-            const input = tbody.querySelector(`.quantity-input[data-card-id="${cardId}"]`);
+            const cubeInstanceId = parseInt(button.dataset.cubeInstanceId, 10);
+            const rowKey = button.dataset.rowKey;
+            const input = tbody.querySelector(`.quantity-input[data-row-key="${rowKey}"]`);
             const quantity = parseInt(input.value, 10);
 
             try {
-                await apiPut(`${INVENTORY_API_BASE}/${cardId}`, {quantity});
+                await apiPut(`${INVENTORY_API_BASE}/${cardId}`, {quantity, cube_instance_id: cubeInstanceId});
                 await renderInventory();
             } catch (err) {
                 showError(err.message);

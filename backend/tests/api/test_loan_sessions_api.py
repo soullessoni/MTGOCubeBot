@@ -5,6 +5,7 @@ from app.models.inventory_item import InventoryItem
 def test_create_loan_session_api(
         client,
         db_session,
+        cube_instance_id,
 ):
     card = Card(
         name="Black Lotus",
@@ -16,6 +17,7 @@ def test_create_loan_session_api(
     db_session.add(
         InventoryItem(
             card_id=card.id,
+            cube_instance_id=cube_instance_id,
             quantity=1,
         )
     )
@@ -25,6 +27,7 @@ def test_create_loan_session_api(
     response = client.post(
         "/loan/sessions",
         json={
+            "cube_instance_id": cube_instance_id,
             "players": [
                 {
                     "player_name": "Alice",

@@ -34,6 +34,7 @@ class LoanSessionGenerator:
     def create_from_draft(
         self,
         players,
+        cube_instance_id,
     ):
         pools = []
 
@@ -71,8 +72,10 @@ class LoanSessionGenerator:
 
         plan = self.planning_service.generate(
             pools,
+            cube_instance_id,
         )
 
         return self.create_session_use_case.execute(
             plan,
+            cube_instance_id,
         )

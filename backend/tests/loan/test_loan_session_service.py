@@ -6,7 +6,7 @@ from app.services.loan.loan_planning_service import (
 from app.services.loan.loan_session_service import LoanSessionService
 
 
-def test_create_loan_session(db_session):
+def test_create_loan_session(db_session, cube_instance_id):
     lotus = Card(
         name="Black Lotus",
     )
@@ -28,7 +28,7 @@ def test_create_loan_session(db_session):
 
     service = LoanSessionService(db_session)
 
-    session = service.create_from_plan(plan)
+    session = service.create_from_plan(plan, cube_instance_id)
 
     assert session.id is not None
     assert session.status == "CREATED"

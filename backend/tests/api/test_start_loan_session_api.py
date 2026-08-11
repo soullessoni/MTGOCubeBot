@@ -4,9 +4,11 @@ from app.models.loan_session import LoanSession
 def test_start_loan_session_api(
         client,
         db_session,
+        cube_instance_id,
 ):
     session = LoanSession(
         status="READY",
+        cube_instance_id=cube_instance_id,
     )
 
     db_session.add(session)
@@ -27,9 +29,11 @@ def test_start_loan_session_api(
 def test_cannot_start_created_session(
         client,
         db_session,
+        cube_instance_id,
 ):
     session = LoanSession(
         status="CREATED",
+        cube_instance_id=cube_instance_id,
     )
 
     db_session.add(session)

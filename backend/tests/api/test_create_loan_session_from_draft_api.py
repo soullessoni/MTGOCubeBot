@@ -4,6 +4,7 @@ from app.models.card import Card
 def test_create_loan_session_from_draft_api(
     client,
     db_session,
+    cube_instance_id,
 ):
     db_session.add(
         Card(name="Black Lotus")
@@ -14,6 +15,7 @@ def test_create_loan_session_from_draft_api(
     response = client.post(
         "/loan/sessions/from-draft",
         json={
+            "cube_instance_id": cube_instance_id,
             "players": [
                 {
                     "player_name": "Alice",
@@ -43,6 +45,7 @@ def test_create_loan_session_from_draft_api(
 def test_create_loan_session_from_draft_multiple_players(
     client,
     db_session,
+    cube_instance_id,
 ):
     db_session.add_all(
         [
@@ -57,6 +60,7 @@ def test_create_loan_session_from_draft_multiple_players(
     response = client.post(
         "/loan/sessions/from-draft",
         json={
+            "cube_instance_id": cube_instance_id,
             "players": [
                 {
                     "player_name": "Alice",
@@ -94,10 +98,12 @@ def test_create_loan_session_from_draft_multiple_players(
 
 def test_create_from_draft_unknown_card(
     client,
+    cube_instance_id,
 ):
     response = client.post(
         "/loan/sessions/from-draft",
         json={
+            "cube_instance_id": cube_instance_id,
             "players": [
                 {
                     "player_name": "Alice",

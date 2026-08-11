@@ -53,7 +53,6 @@ class Card(Base):
     inventory = relationship(
         "InventoryItem",
         back_populates="card",
-        uselist=False,
     )
 
     loan_assignments = relationship(

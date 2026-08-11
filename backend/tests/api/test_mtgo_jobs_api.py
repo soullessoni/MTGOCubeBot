@@ -21,16 +21,16 @@ def fake_runner():
     app.dependency_overrides.pop(get_job_runner, None)
 
 
-def _make_session(db_session) -> LoanSession:
-    session = LoanSession(status="IN_PROGRESS")
+def _make_session(db_session, cube_instance_id) -> LoanSession:
+    session = LoanSession(status="IN_PROGRESS", cube_instance_id=cube_instance_id)
     db_session.add(session)
     db_session.commit()
     db_session.refresh(session)
     return session
 
 
-def test_trigger_give_returns_pending_job(client, db_session, fake_runner):
-    session = _make_session(db_session)
+def test_trigger_give_returns_pending_job(client, db_session, cube_instance_id, fake_runner):
+    session = _make_session(db_session, cube_instance_id)
 
     response = client.post(f"/mtgo/sessions/{session.id}/give")
 
@@ -49,8 +49,8 @@ def test_trigger_give_404s_for_missing_session(client, fake_runner):
     assert fake_runner.calls == []
 
 
-def test_trigger_return_requires_mtgo_username_in_body(client, db_session, fake_runner):
-    session = _make_session(db_session)
+def test_trigger_return_requires_mtgo_username_in_body(client, db_session, cube_instance_id, fake_runner):
+    session = _make_session(db_session, cube_instance_id)
 
     response = client.post(
         f"/mtgo/sessions/{session.id}/return",
@@ -103,8 +103,8 @@ def test_get_job_returns_404_for_missing(client):
     assert response.status_code == 404
 
 
-def test_get_job_after_trigger(client, db_session, fake_runner):
-    session = _make_session(db_session)
+def test_get_job_after_trigger(client, db_session, cube_instance_id, fake_runner):
+    session = _make_session(db_session, cube_instance_id)
     triggered = client.post(f"/mtgo/sessions/{session.id}/give").json()
 
     response = client.get(f"/mtgo/jobs/{triggered['id']}")
@@ -113,9 +113,9 @@ def test_get_job_after_trigger(client, db_session, fake_runner):
     assert response.json()["id"] == triggered["id"]
 
 
-def test_list_jobs_filters_by_session(client, db_session, fake_runner):
-    session_a = _make_session(db_session)
-    session_b = _make_session(db_session)
+def test_list_jobs_filters_by_session(client, db_session, cube_instance_id, fake_runner):
+    session_a = _make_session(db_session, cube_instance_id)
+    session_b = _make_session(db_session, cube_instance_id)
     client.post(f"/mtgo/sessions/{session_a.id}/give")
     client.post(f"/mtgo/sessions/{session_b.id}/give")
 
@@ -127,8 +127,8 @@ def test_list_jobs_filters_by_session(client, db_session, fake_runner):
     assert data[0]["session_id"] == session_a.id
 
 
-def test_retry_job_creates_new_job_linked_to_original(client, db_session, fake_runner):
-    session = _make_session(db_session)
+def test_retry_job_creates_new_job_linked_to_original(client, db_session, cube_instance_id, fake_runner):
+    session = _make_session(db_session, cube_instance_id)
     original = client.post(
         f"/mtgo/sessions/{session.id}/return",
         json={"mtgo_username": "FruitDuChene"},

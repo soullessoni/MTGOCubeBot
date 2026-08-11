@@ -7,6 +7,7 @@ from app.models.loan_session import LoanSession
 def test_list_inventory_api(
         client,
         db_session,
+        cube_instance_id,
 ):
     card = Card(name="Black Lotus")
 
@@ -16,11 +17,12 @@ def test_list_inventory_api(
     db_session.add(
         InventoryItem(
             card_id=card.id,
+            cube_instance_id=cube_instance_id,
             quantity=2,
         )
     )
 
-    session = LoanSession(status="IN_PROGRESS")
+    session = LoanSession(status="IN_PROGRESS", cube_instance_id=cube_instance_id)
 
     session.assignments.append(
         LoanAssignment(
@@ -60,6 +62,7 @@ def test_list_inventory_api_empty(
 def test_update_inventory_quantity_api(
         client,
         db_session,
+        cube_instance_id,
 ):
     card = Card(name="Black Lotus")
 
@@ -68,7 +71,7 @@ def test_update_inventory_quantity_api(
 
     response = client.put(
         f"/inventory/{card.id}",
-        json={"quantity": 3},
+        json={"cube_instance_id": cube_instance_id, "quantity": 3},
     )
 
     assert response.status_code == 200
@@ -83,6 +86,7 @@ def test_update_inventory_quantity_api(
 def test_update_inventory_quantity_overwrites_existing(
         client,
         db_session,
+        cube_instance_id,
 ):
     card = Card(name="Black Lotus")
 
@@ -92,6 +96,7 @@ def test_update_inventory_quantity_overwrites_existing(
     db_session.add(
         InventoryItem(
             card_id=card.id,
+            cube_instance_id=cube_instance_id,
             quantity=1,
         )
     )
@@ -100,7 +105,7 @@ def test_update_inventory_quantity_overwrites_existing(
 
     response = client.put(
         f"/inventory/{card.id}",
-        json={"quantity": 5},
+        json={"cube_instance_id": cube_instance_id, "quantity": 5},
     )
 
     assert response.status_code == 200
@@ -110,10 +115,11 @@ def test_update_inventory_quantity_overwrites_existing(
 def test_update_inventory_quantity_unknown_card(
         client,
         db_session,
+        cube_instance_id,
 ):
     response = client.put(
         "/inventory/999",
-        json={"quantity": 1},
+        json={"cube_instance_id": cube_instance_id, "quantity": 1},
     )
 
     assert response.status_code == 404

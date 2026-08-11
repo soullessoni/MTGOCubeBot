@@ -11,6 +11,7 @@ class LoanSessionService:
     def create_from_plan(
             self,
             plan: LoanPlanningResult,
+            cube_instance_id: int,
     ) -> LoanSession:
 
         if not plan.valid:
@@ -20,6 +21,7 @@ class LoanSessionService:
 
         session = LoanSession(
             status="CREATED",
+            cube_instance_id=cube_instance_id,
         )
 
         self.db.add(session)

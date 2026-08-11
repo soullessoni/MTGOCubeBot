@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
@@ -13,6 +13,15 @@ class LoanSession(Base):
         Integer,
         primary_key=True,
         index=True,
+    )
+
+    # Which physical pool of cards this session draws from and returns
+    # to — required so planning/availability checks and (eventually) MTGO
+    # job routing know which account/cube copy is involved.
+    cube_instance_id = Column(
+        Integer,
+        ForeignKey("cube_instances.id"),
+        nullable=False,
     )
 
     status = Column(

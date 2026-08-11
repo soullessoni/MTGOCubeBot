@@ -6,8 +6,8 @@ from app.use_cases.loan.set_session_deposit_settings import (
 )
 
 
-def test_set_deposit_settings_enables_deposit(db_session):
-    session = LoanSession(status="CREATED")
+def test_set_deposit_settings_enables_deposit(db_session, cube_instance_id):
+    session = LoanSession(status="CREATED", cube_instance_id=cube_instance_id)
     db_session.add(session)
     db_session.commit()
 
@@ -23,11 +23,12 @@ def test_set_deposit_settings_enables_deposit(db_session):
     assert result.deposit_amount == 15
 
 
-def test_set_deposit_settings_disables_deposit_and_clears_amount(db_session):
+def test_set_deposit_settings_disables_deposit_and_clears_amount(db_session, cube_instance_id):
     session = LoanSession(
         status="CREATED",
         deposit_required=True,
         deposit_amount=15,
+        cube_instance_id=cube_instance_id,
     )
     db_session.add(session)
     db_session.commit()
@@ -44,8 +45,8 @@ def test_set_deposit_settings_disables_deposit_and_clears_amount(db_session):
     assert result.deposit_amount is None
 
 
-def test_set_deposit_settings_rejects_required_without_positive_amount(db_session):
-    session = LoanSession(status="CREATED")
+def test_set_deposit_settings_rejects_required_without_positive_amount(db_session, cube_instance_id):
+    session = LoanSession(status="CREATED", cube_instance_id=cube_instance_id)
     db_session.add(session)
     db_session.commit()
 

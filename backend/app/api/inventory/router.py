@@ -20,6 +20,7 @@ router = APIRouter(
     response_model=list[InventoryItemResponse],
 )
 def list_inventory(
+        cube_instance_id: int | None = None,
         db: Session = Depends(get_db),
 ):
     service = InventoryService(db)
@@ -28,10 +29,11 @@ def list_inventory(
         InventoryItemResponse(
             card_id=item.card_id,
             card_name=item.card_name,
+            cube_instance_id=item.cube_instance_id,
             quantity=item.quantity,
-            available_quantity=service.get_available_quantity(item.card),
+            available_quantity=service.get_available_quantity(item.card, item.cube_instance_id),
         )
-        for item in service.list_all()
+        for item in service.list_all(cube_instance_id)
     ]
 
 
@@ -57,11 +59,12 @@ def update_inventory_quantity(
         )
 
     service = InventoryService(db)
-    service.set_quantity(card, payload.quantity)
+    service.set_quantity(card, payload.cube_instance_id, payload.quantity)
 
     return InventoryItemResponse(
         card_id=card.id,
         card_name=card.name,
+        cube_instance_id=payload.cube_instance_id,
         quantity=payload.quantity,
-        available_quantity=service.get_available_quantity(card),
+        available_quantity=service.get_available_quantity(card, payload.cube_instance_id),
     )

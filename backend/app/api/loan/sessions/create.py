@@ -61,6 +61,7 @@ def create_loan_session(
     
     planning_result = planning_service.generate(
         pools,
+        payload.cube_instance_id,
     )
 
     if planning_result.conflicts:
@@ -76,6 +77,7 @@ def create_loan_session(
     try:
         return use_case.execute(
             planning_result.requests,
+            payload.cube_instance_id,
             deposit_required=payload.deposit_required,
             deposit_amount=payload.deposit_amount,
         )

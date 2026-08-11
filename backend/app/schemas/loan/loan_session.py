@@ -18,6 +18,7 @@ class PlayerLoanRequest(BaseModel):
 
 class LoanSessionCreate(BaseModel):
     players: list[PlayerLoanRequest]
+    cube_instance_id: int
     deposit_required: bool = False
     deposit_amount: int | None = None
 
@@ -26,6 +27,7 @@ class LoanSessionResponse(BaseModel):
     id: int
     status: str
     created_at: datetime
+    cube_instance_id: int
     deposit_required: bool
     deposit_amount: int | None = None
     assignments: list[LoanAssignmentResponse]

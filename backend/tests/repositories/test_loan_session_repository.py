@@ -4,13 +4,14 @@ from app.repositories.loan_session_repository import LoanSessionRepository
 
 def test_create_and_get_session(
     db_session,
+    cube_instance_id,
 ):
 
     repository = LoanSessionRepository(
         db_session,
     )
 
-    session = LoanSession()
+    session = LoanSession(cube_instance_id=cube_instance_id)
 
     created = repository.create(
         session,

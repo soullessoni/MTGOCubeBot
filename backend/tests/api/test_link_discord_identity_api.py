@@ -6,10 +6,11 @@ from app.models.loan_session import LoanSession
 def test_link_discord_identity_api(
         client,
         db_session,
+        cube_instance_id,
 ):
     card = Card(name="Black Lotus")
 
-    session = LoanSession(status="CREATED")
+    session = LoanSession(status="CREATED", cube_instance_id=cube_instance_id)
 
     assignment = LoanAssignment(
         card=card,

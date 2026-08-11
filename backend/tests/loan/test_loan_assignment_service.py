@@ -6,9 +6,10 @@ from app.services.loan.loan_assignment_service import (
 )
 
 
-def test_mark_prepared_persists(db_session):
+def test_mark_prepared_persists(db_session, cube_instance_id):
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
@@ -32,9 +33,10 @@ def test_mark_prepared_persists(db_session):
     assert result.status == "PREPARED"
 
 
-def test_mark_distributed_persists(db_session):
+def test_mark_distributed_persists(db_session, cube_instance_id):
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
@@ -58,9 +60,10 @@ def test_mark_distributed_persists(db_session):
     assert result.status == "DISTRIBUTED"
 
 
-def test_mark_confirmed_persists(db_session):
+def test_mark_confirmed_persists(db_session, cube_instance_id):
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
@@ -84,9 +87,10 @@ def test_mark_confirmed_persists(db_session):
     assert result.status == "CONFIRMED"
 
 
-def test_mark_returned_persists(db_session):
+def test_mark_returned_persists(db_session, cube_instance_id):
     session = LoanSession(
         status="IN_PROGRESS",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(

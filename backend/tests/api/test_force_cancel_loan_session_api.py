@@ -7,6 +7,7 @@ from app.models.loan_session import LoanSession
 def test_force_cancel_loan_session_api(
         client,
         db_session,
+        cube_instance_id,
 ):
     card = Card(name="Black Lotus")
 
@@ -16,11 +17,12 @@ def test_force_cancel_loan_session_api(
     db_session.add(
         InventoryItem(
             card_id=card.id,
+            cube_instance_id=cube_instance_id,
             quantity=1,
         )
     )
 
-    session = LoanSession(status="IN_PROGRESS")
+    session = LoanSession(status="IN_PROGRESS", cube_instance_id=cube_instance_id)
 
     session.assignments.append(
         LoanAssignment(
@@ -55,8 +57,9 @@ def test_force_cancel_loan_session_api(
 def test_cannot_force_cancel_completed_session_api(
         client,
         db_session,
+        cube_instance_id,
 ):
-    session = LoanSession(status="COMPLETED")
+    session = LoanSession(status="COMPLETED", cube_instance_id=cube_instance_id)
 
     db_session.add(session)
     db_session.commit()

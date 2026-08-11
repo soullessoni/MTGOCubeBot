@@ -8,6 +8,7 @@ class DraftPlayerPool(BaseModel):
 
 class CreateLoanSessionFromDraftRequest(BaseModel):
     players: list[DraftPlayerPool]
+    cube_instance_id: int
 
 class CreateLoanSessionFromDraftUrlRequest(BaseModel):
     draft_url: str

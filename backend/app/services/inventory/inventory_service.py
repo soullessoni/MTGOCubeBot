@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.models.card import Card
 from app.models.inventory_item import InventoryItem
 from app.models.loan_assignment import LoanAssignment
+from app.models.loan_session import LoanSession
 
 
 class InventoryService:
@@ -14,12 +15,14 @@ class InventoryService:
     def get(
             self,
             card: Card,
+            cube_instance_id: int,
     ) -> InventoryItem | None:
 
         return (
             self.db.query(InventoryItem)
             .filter(
-                InventoryItem.card_id == card.id
+                InventoryItem.card_id == card.id,
+                InventoryItem.cube_instance_id == cube_instance_id,
             )
             .first()
         )
@@ -27,9 +30,10 @@ class InventoryService:
     def get_quantity(
             self,
             card: Card,
+            cube_instance_id: int,
     ) -> int:
 
-        item = self.get(card)
+        item = self.get(card, cube_instance_id)
 
         if item is None:
             return 0
@@ -39,17 +43,19 @@ class InventoryService:
     def _stage_quantity(
             self,
             card: Card,
+            cube_instance_id: int,
             quantity: int,
     ):
         """Same as `set_quantity`, but leaves committing to the caller —
         used by bulk operations that need to set many cards' quantities
         in a single transaction instead of one commit per card."""
 
-        item = self.get(card)
+        item = self.get(card, cube_instance_id)
 
         if item is None:
             item = InventoryItem(
                 card_id=card.id,
+                cube_instance_id=cube_instance_id,
                 quantity=quantity,
             )
 
@@ -61,17 +67,29 @@ class InventoryService:
     def set_quantity(
             self,
             card: Card,
+            cube_instance_id: int,
             quantity: int,
     ):
-        self._stage_quantity(card, quantity)
+        self._stage_quantity(card, cube_instance_id, quantity)
         self.db.commit()
 
-    def list_all(self) -> list[InventoryItem]:
-        return self.db.query(InventoryItem).all()
+    def list_all(
+            self,
+            cube_instance_id: int | None = None,
+    ) -> list[InventoryItem]:
+        query = self.db.query(InventoryItem)
+
+        if cube_instance_id is not None:
+            query = query.filter(
+                InventoryItem.cube_instance_id == cube_instance_id
+            )
+
+        return query.all()
 
     def get_reserved_quantity(
             self,
             card: Card,
+            cube_instance_id: int,
     ) -> int:
 
         reserved = (
@@ -81,8 +99,13 @@ class InventoryService:
                     0,
                 )
             )
+            .join(
+                LoanSession,
+                LoanAssignment.session_id == LoanSession.id,
+            )
             .filter(
                 LoanAssignment.card_id == card.id,
+                LoanSession.cube_instance_id == cube_instance_id,
                 LoanAssignment.status.notin_(
                     ["RETURNED", "CANCELLED"]
                 ),
@@ -95,11 +118,12 @@ class InventoryService:
     def get_available_quantity(
             self,
             card: Card,
+            cube_instance_id: int,
     ) -> int:
 
         available = (
-                self.get_quantity(card)
-                - self.get_reserved_quantity(card)
+                self.get_quantity(card, cube_instance_id)
+                - self.get_reserved_quantity(card, cube_instance_id)
         )
 
         return max(available, 0)

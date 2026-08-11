@@ -33,7 +33,7 @@ def create_cube_with_card(
     return cube, card
 
 
-def test_cube_missing_card(db_session):
+def test_cube_missing_card(db_session, cube_instance_id):
     cube, card = create_cube_with_card(
         db_session,
         "Black Lotus",
@@ -42,14 +42,14 @@ def test_cube_missing_card(db_session):
     inventory = InventoryService(db_session)
     service = CubeCompletenessService(inventory)
 
-    result = service.check(cube)
+    result = service.check(cube, cube_instance_id)
 
     assert result.complete is False
     assert len(result.missing_cards) == 1
     assert result.missing_cards[0].card == card
 
 
-def test_cube_complete(db_session):
+def test_cube_complete(db_session, cube_instance_id):
     cube, card = create_cube_with_card(
         db_session,
         "Black Lotus",
@@ -57,17 +57,17 @@ def test_cube_complete(db_session):
 
     inventory = InventoryService(db_session)
 
-    inventory.set_quantity(card, 1)
+    inventory.set_quantity(card, cube_instance_id, 1)
 
     service = CubeCompletenessService(inventory)
 
-    result = service.check(cube)
+    result = service.check(cube, cube_instance_id)
 
     assert result.complete is True
     assert len(result.missing_cards) == 0
 
 
-def test_cube_missing_quantity(db_session):
+def test_cube_missing_quantity(db_session, cube_instance_id):
     cube, card = create_cube_with_card(
         db_session,
         "Lightning Bolt",
@@ -76,11 +76,11 @@ def test_cube_missing_quantity(db_session):
 
     inventory = InventoryService(db_session)
 
-    inventory.set_quantity(card, 1)
+    inventory.set_quantity(card, cube_instance_id, 1)
 
     service = CubeCompletenessService(inventory)
 
-    result = service.check(cube)
+    result = service.check(cube, cube_instance_id)
 
     assert result.complete is False
     assert len(result.missing_cards) == 1

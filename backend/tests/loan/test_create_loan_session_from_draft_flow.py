@@ -3,7 +3,7 @@ from app.use_cases.loan.create_loan_session_from_draft import (
     CreateLoanSessionFromDraftUseCase,
 )
 
-def test_create_loan_session_from_draft_flow(db_session):
+def test_create_loan_session_from_draft_flow(db_session, cube_instance_id):
 
     cards = [
         Card(name="Black Lotus"),
@@ -34,6 +34,7 @@ def test_create_loan_session_from_draft_flow(db_session):
                 ],
             },
         ],
+        cube_instance_id=cube_instance_id,
     )
 
     assert session.id is not None

@@ -6,9 +6,10 @@ from app.services.loan.loan_assignment_service import (
 )
 
 
-def test_link_discord_identity_persists(db_session):
+def test_link_discord_identity_persists(db_session, cube_instance_id):
     session = LoanSession(
         status="CREATED",
+        cube_instance_id=cube_instance_id,
     )
 
     assignment = LoanAssignment(
