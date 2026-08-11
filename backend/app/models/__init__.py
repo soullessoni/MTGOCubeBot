@@ -5,6 +5,7 @@ from app.models.inventory_item import InventoryItem
 from app.models.loan_assignment import LoanAssignment
 from app.models.loan_deposit import LoanDeposit
 from app.models.loan_session import LoanSession
+from app.models.mtgo_account import MtgoAccount
 from app.models.mtgo_job import MtgoJob
 
 __all__ = [
@@ -15,5 +16,6 @@ __all__ = [
     "LoanAssignment",
     "LoanDeposit",
     "LoanSession",
+    "MtgoAccount",
     "MtgoJob",
 ]
