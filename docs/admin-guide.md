@@ -25,35 +25,87 @@ une tâche de fond qui pilote le client MTGO du bot en temps réel
 joueur accepte l'échange), suivie via son statut (`PENDING` → `RUNNING`
 → `SUCCEEDED` / `FAILED`).
 
+## Comptes MTGO, cubes et instances
+
+Le bot peut gérer plusieurs comptes MTGO, plusieurs cubes, et plusieurs
+instances (copies physiques) d'un même cube en parallèle :
+
+- un **compte MTGO** (`MtgoAccount`) est une simple identité de
+  connexion — nom + pseudo MTGO exact, sans notion de cube attachée ;
+- un **cube** (`Cube`) est la composition de référence d'un cube,
+  importée depuis une URL CubeCobra ;
+- une **instance de cube** (`CubeInstance`) relie les deux — c'est
+  elle qui porte réellement l'inventaire et les sessions de prêt, pas
+  le compte ni le cube directement.
+
+Un compte peut héberger plusieurs cubes différents, ou plusieurs
+instances du **même** cube (deux copies physiques suivies comme deux
+pools d'inventaire séparés, pour faire tourner deux drafts en
+parallèle sans se marcher dessus).
+
+Gestion via le dashboard (`accounts.html`) — formulaires pour importer
+un cube depuis CubeCobra, créer un compte, créer une instance à partir
+d'un cube et d'un compte, et activer/désactiver chacun — ou directement
+via l'API :
+
+```
+POST /cubes/                      {"name": ..., "cube_url": "https://cubecobra.com/cube/list/..."}
+POST /mtgo/accounts/              {"name": ..., "mtgo_username": ...}
+POST /mtgo/cube-instances/        {"cube_id": ..., "mtgo_account_id": ..., "label": "Instance A"}
+```
+
+Chaque instance créée a un `id` — c'est cette `cube_instance_id` qui
+sert de référence pour tout ce qui suit (créer une session, peupler
+l'inventaire, vérifier l'intégrité du cube).
+
+**Routage des jobs et verrou** : chaque job MTGO déclenché
+(distribution, récupération, vérification d'intégrité) est routé vers
+le compte hébergeant l'instance concernée — le backend injecte le bon
+`MTGO_USERNAME` dans le sous-processus d'automatisation. Un verrou en
+mémoire empêche deux jobs de piloter le même compte en même temps ; un
+job déclenché sur un compte déjà occupé échoue immédiatement (`FAILED`)
+avec un message clair plutôt que de rester bloqué en `PENDING`.
+
+**Limite connue** : la connexion MTGO elle-même
+(`agent/mtgo/ensure_ready.py`) reste mono-compte — `agent/.env` ne
+porte qu'un seul `MTGO_USERNAME`/`MTGO_PASSWORD`. Chaque compte utilisé
+doit donc déjà être connecté sur le client MTGO ; aucun mot de passe
+n'est stocké en base, par design.
+
 ## Créer une session de prêt
 
 Pas d'interface dédiée dans le dashboard pour l'instant — uniquement via
-l'API, deux façons :
+l'API, deux façons. Les deux requièrent une `cube_instance_id`
+existante (voir ci-dessus).
 
 **À partir de noms de cartes** (le plus simple à écrire à la main) :
 
 ```
 POST /loan/sessions/from-draft
-{"players": [{"player_name": "Alice", "cards": ["Brainstorm", "Wingcrafter"]}, {"player_name": "Bob", "cards": ["Lightning Bolt"]}]}
+{"players": [{"player_name": "Alice", "cards": ["Brainstorm", "Wingcrafter"]}, {"player_name": "Bob", "cards": ["Lightning Bolt"]}], "cube_instance_id": 1}
 ```
 
-Résout chaque nom via l'inventaire (`/inventory/`) ; répond 404 si une
-carte n'existe pas dans le cube. Ne permet pas de fixer la caution à la
-création — utiliser `PATCH .../deposit-settings` (voir plus bas) juste
-après si besoin.
+Résout chaque nom via l'inventaire de cette instance ; répond 404 si
+une carte n'existe pas dans le cube. Ne permet pas de fixer la caution
+à la création — utiliser `PATCH .../deposit-settings` (voir plus bas)
+juste après si besoin.
 
 **Par `card_id`** (permet de fixer la caution dès la création) :
 
 ```
 POST /loan/sessions/
-{"players": [{"player_name": "Alice", "cards": [{"card_id": 2, "quantity": 1}]}], "deposit_required": true, "deposit_amount": 10}
+{"players": [{"player_name": "Alice", "cards": [{"card_id": 2, "quantity": 1}]}], "cube_instance_id": 1, "deposit_required": true, "deposit_amount": 10}
 ```
 
-Les `card_id` viennent de `GET /inventory/`. Répond 409 si la quantité
-demandée dépasse le stock disponible.
+Les `card_id` viennent de `GET /inventory/?cube_instance_id=1`. Répond
+409 si la quantité demandée dépasse le stock disponible sur cette
+instance.
 
-Les deux renvoient la session créée ; son `id` sert de `session_id` pour
-toute la suite (dashboard, commandes Discord).
+Les deux renvoient la session créée ; son `id` sert de `session_id`
+pour toute la suite (dashboard, commandes Discord). La session reste
+liée à cette instance pour toute sa durée de vie — c'est elle qui
+détermine sur quel compte MTGO les jobs de distribution/récupération
+seront routés.
 
 ## Le dashboard
 
@@ -84,9 +136,19 @@ de création. Le lien "Voir" ouvre le détail d'une session.
 
 ### Inventaire (`inventory.html`)
 
-Liste des cartes du cube avec la quantité possédée et la quantité
-disponible (possédée moins ce qui est actuellement en prêt). La
-quantité possédée peut être corrigée directement.
+Liste les cartes de **toutes** les instances de cube (pas de filtre
+dans l'UI pour l'instant) avec, pour chaque ligne, l'instance
+concernée, la quantité possédée et la quantité disponible (possédée
+moins ce qui est actuellement en prêt sur cette même instance). La
+quantité possédée peut être corrigée directement — une même carte peut
+apparaître sur plusieurs lignes si elle existe dans plusieurs
+instances, chacune avec son propre stock indépendant.
+
+### Comptes MTGO (`accounts.html`)
+
+Créer/lister les cubes (import CubeCobra), les comptes MTGO, et les
+instances de cube — voir [Comptes MTGO, cubes et instances](#comptes-mtgo-cubes-et-instances)
+plus haut. Chaque ligne a un bouton pour activer/désactiver.
 
 ### Administration MTGO (`mtgo.html`)
 
@@ -96,9 +158,9 @@ Le panneau qui déclenche les vraies actions sur le client MTGO du bot.
 
 | Action | Ce qu'elle fait |
 |---|---|
-| Déclencher la distribution | Crée le binder MTGO d'une session avec les cartes `PREPARED` de chaque joueur identifié, puis lui envoie une vraie demande d'échange l'exposant. Le joueur accepte et pioche ce qu'il veut via Search Tools ; le bot soumet et confirme son propre côté (vide, sauf caution — voir ci-dessous) une fois que le joueur a fini. Ce qui a réellement quitté le compte du bot est ensuite vérifié par export/diff, jamais en se fiant à la fenêtre d'échange en direct. Chaque carte confirmée comme donnée (même si le joueur n'a pas tout pris) passe automatiquement `PREPARED` → `DISTRIBUTED`, et le joueur reçoit aussitôt un MP avec le bouton "J'ai reçu ces cartes" — pas besoin qu'il rouvre "Corriger mon pseudo MTGO" pour l'obtenir. |
-| Déclencher la récupération | Envoie une demande d'échange au joueur MTGO indiqué, attend qu'il accepte, puis récupère toutes ses cartes `CONFIRMED` pour cette session (et rend sa caution si la session en a une). |
-| Vérifier l'intégrité du cube | Compare la collection réelle du bot sur MTGO à l'inventaire de référence (en tenant compte de ce qui est actuellement en prêt), et remonte tout écart. Action en lecture seule, sans risque. |
+| Déclencher la distribution | Crée le binder MTGO d'une session avec les cartes `PREPARED` de chaque joueur identifié, puis lui envoie une vraie demande d'échange l'exposant. Le joueur accepte et pioche ce qu'il veut via Search Tools ; le bot soumet et confirme son propre côté (vide, sauf caution — voir ci-dessous) une fois que le joueur a fini. Ce qui a réellement quitté le compte du bot est ensuite vérifié par export/diff, jamais en se fiant à la fenêtre d'échange en direct. Chaque carte confirmée comme donnée (même si le joueur n'a pas tout pris) passe automatiquement `PREPARED` → `DISTRIBUTED`, et le joueur reçoit aussitôt un MP avec le bouton "J'ai reçu ces cartes" — pas besoin qu'il rouvre "Corriger mon pseudo MTGO" pour l'obtenir. Routé automatiquement vers le compte MTGO de la session (voir plus haut) ; échoue immédiatement si ce compte a déjà un job en cours. |
+| Déclencher la récupération | Envoie une demande d'échange au joueur MTGO indiqué, attend qu'il accepte, puis récupère toutes ses cartes `CONFIRMED` pour cette session (et rend sa caution si la session en a une). Même routage/verrou de compte que la distribution. |
+| Vérifier l'intégrité du cube | Demande un ID d'instance de cube, compare la collection réelle du compte MTGO hébergeant cette instance à l'inventaire de référence de cette même instance (en tenant compte de ce qui est actuellement en prêt), et remonte tout écart. Action en lecture seule, sans risque. |
 
 **Tableau des jobs récents** : se met à jour automatiquement toutes les
 5 secondes. Chaque ligne montre l'ID, le type, le statut, la session/le
@@ -199,7 +261,7 @@ reçoit un message "Réservé aux admins." au lieu d'échouer silencieusement.
 |---|---|
 | `/mtgo-give <session_id>` | Équivalent Discord du bouton "Déclencher la distribution" du dashboard. |
 | `/mtgo-return <session_id> <mtgo_username>` | Équivalent du bouton "Déclencher la récupération". |
-| `/mtgo-integrity-check` | Équivalent du bouton "Vérifier l'intégrité du cube". |
+| `/mtgo-integrity-check <cube_instance_id>` | Équivalent du bouton "Vérifier l'intégrité du cube". |
 | `/mtgo-job-status <job_id>` | Consulte le statut et les dernières lignes de journal d'un job en cours ou passé — utile si on a fermé la notification initiale ou si le bot a redémarré pendant l'attente. |
 
 Après un déclenchement (`/mtgo-give`, `/mtgo-return`,
@@ -221,7 +283,7 @@ mêmes boutons de rattrapage ("Relancer la récupération" /
 | `BACKEND_API_URL` | URL du backend, `http://localhost:8000` par défaut. |
 | `DISCORD_CATEGORY_NAME` | Catégorie où créer les salons de session, `Automated Draft on MTGO` par défaut. |
 | `CLEANUP_INTERVAL_MINUTES` | Fréquence de nettoyage des salons terminés, 2 minutes par défaut. |
-| `MTGO_USERNAME` / `MTGO_PASSWORD` | Compte MTGO du bot, utilisé par les scripts d'automatisation. |
+| `MTGO_USERNAME` / `MTGO_PASSWORD` | Compte MTGO par défaut, utilisé par les scripts d'automatisation. Le backend surcharge `MTGO_USERNAME` par job selon l'instance de cube ciblée (voir « Comptes MTGO, cubes et instances ») ; cette valeur ne sert que de repli et pour la connexion initiale (`ensure_ready.py`, encore mono-compte). |
 
 **Backend** (variables d'environnement du process, pas de fichier
 `.env` côté backend) :
@@ -239,19 +301,20 @@ ou leur donner la permission serveur "Administrateur".
 ## Peupler l'inventaire depuis un export MTGO réel
 
 La vérification d'intégrité du cube compare la collection MTGO réelle
-à la table `/inventory/` du backend — elle n'est fiable que si cette
-table reflète le cube complet. Pour la (re)peupler depuis un vrai
-export "Full Trade List" :
+à l'inventaire d'une instance de cube donnée — elle n'est fiable que si
+cet inventaire reflète le cube complet pour cette instance. Pour le
+(re)peupler depuis un vrai export "Full Trade List" :
 
 ```
-.venv/Scripts/python.exe scripts/import_inventory_from_dek.py <chemin-vers-le-.dek>
+.venv/Scripts/python.exe scripts/import_inventory_from_dek.py <cube_instance_id> <chemin-vers-le-.dek>
 ```
 
 Crée les cartes manquantes, met à jour les quantités possédées pour
-chaque carte présente dans l'export, et remet à zéro toute carte de
-l'inventaire absente de l'export (donnée de test obsolète, carte
-retirée du cube, etc.). À relancer chaque fois que la composition du
-cube change.
+chaque carte présente dans l'export **pour cette instance**, et remet
+à zéro toute carte de l'inventaire de cette instance absente de
+l'export (donnée de test obsolète, carte retirée du cube, etc.) — les
+autres instances ne sont pas affectées. À relancer chaque fois que la
+composition du cube change.
 
 ## Fiabilité en production
 

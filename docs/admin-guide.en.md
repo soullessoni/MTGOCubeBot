@@ -24,19 +24,67 @@ seconds to a few minutes, however long it takes a player to accept the
 trade), tracked via its status (`PENDING` → `RUNNING` →
 `SUCCEEDED` / `FAILED`).
 
+## MTGO accounts, cubes, and instances
+
+The bot can manage several MTGO accounts, several cubes, and several
+instances (physical copies) of the same cube side by side:
+
+- an **MTGO account** (`MtgoAccount`) is a plain login identity — a
+  name plus the exact MTGO username, with no cube attached to it;
+- a **cube** (`Cube`) is a cube's reference composition, imported from
+  a CubeCobra URL;
+- a **cube instance** (`CubeInstance`) links the two — it's the
+  instance that actually owns the inventory and loan sessions, not the
+  account or the cube directly.
+
+One account can host several different cubes, or several instances of
+the **same** cube (two physical copies tracked as two separate
+inventory pools, so two drafts can run in parallel without stepping on
+each other).
+
+Manage these via the dashboard (`accounts.html`) — forms to import a
+cube from CubeCobra, create an account, create an instance from a
+cube+account pair, and toggle each active/inactive — or directly via
+the API:
+
+```
+POST /cubes/                      {"name": ..., "cube_url": "https://cubecobra.com/cube/list/..."}
+POST /mtgo/accounts/              {"name": ..., "mtgo_username": ...}
+POST /mtgo/cube-instances/        {"cube_id": ..., "mtgo_account_id": ..., "label": "Instance A"}
+```
+
+Each created instance has an `id` — that `cube_instance_id` is the
+reference everything downstream needs (creating a session, populating
+inventory, checking cube integrity).
+
+**Job routing and locking**: every MTGO job triggered (give, return,
+integrity check) is routed to the account hosting the instance
+involved — the backend injects the right `MTGO_USERNAME` into the
+automation subprocess. An in-process lock stops two jobs from driving
+the same account at once; a job triggered against a busy account fails
+immediately (`FAILED`) with a clear message instead of sitting stuck
+at `PENDING`.
+
+**Known limitation**: logging into MTGO itself
+(`agent/mtgo/ensure_ready.py`) is still single-account —
+`agent/.env` only carries one `MTGO_USERNAME`/`MTGO_PASSWORD`. Every
+account used needs to already be logged into the MTGO client; no
+password is ever stored in the database, by design.
+
 ## Creating a loan session
 
-No dedicated dashboard interface for this yet — API only, two ways:
+No dedicated dashboard interface for this yet — API only, two ways.
+Both require an existing `cube_instance_id` (see above).
 
 **From card names** (the simplest to write by hand):
 
 ```
 POST /loan/sessions/from-draft
-{"players": [{"player_name": "Alice", "cards": ["Brainstorm", "Wingcrafter"]}, {"player_name": "Bob", "cards": ["Lightning Bolt"]}]}
+{"players": [{"player_name": "Alice", "cards": ["Brainstorm", "Wingcrafter"]}, {"player_name": "Bob", "cards": ["Lightning Bolt"]}], "cube_instance_id": 1}
 ```
 
-Resolves each name against the inventory (`/inventory/`); returns 404 if
-a card doesn't exist in the cube. Doesn't let you set a deposit at
+Resolves each name against that instance's inventory; returns 404 if a
+card doesn't exist in the cube. Doesn't let you set a deposit at
 creation time — use `PATCH .../deposit-settings` (see below) right
 after if needed.
 
@@ -44,14 +92,17 @@ after if needed.
 
 ```
 POST /loan/sessions/
-{"players": [{"player_name": "Alice", "cards": [{"card_id": 2, "quantity": 1}]}], "deposit_required": true, "deposit_amount": 10}
+{"players": [{"player_name": "Alice", "cards": [{"card_id": 2, "quantity": 1}]}], "cube_instance_id": 1, "deposit_required": true, "deposit_amount": 10}
 ```
 
-`card_id` values come from `GET /inventory/`. Returns 409 if the
-requested quantity exceeds available stock.
+`card_id` values come from `GET /inventory/?cube_instance_id=1`.
+Returns 409 if the requested quantity exceeds that instance's
+available stock.
 
 Both return the created session; its `id` is the `session_id` used for
-everything that follows (dashboard, Discord commands).
+everything that follows (dashboard, Discord commands). The session
+stays tied to this instance for its whole lifetime — that's what
+determines which MTGO account its give/return jobs get routed to.
 
 ## The dashboard
 
@@ -82,9 +133,19 @@ Lists every loan session: ID, status, card count, creation date. The
 
 ### Inventory (`inventory.html`)
 
-Lists the cube's cards with the quantity owned and the quantity
-available (owned minus whatever is currently on loan). The owned
-quantity can be corrected directly.
+Lists the cards across **every** cube instance (no filter in the UI
+yet), with each row showing which instance it belongs to, the
+quantity owned, and the quantity available (owned minus whatever is
+currently on loan on that same instance). The owned quantity can be
+corrected directly — the same card can appear on several rows if it
+exists in more than one instance, each with its own independent
+stock.
+
+### MTGO accounts (`accounts.html`)
+
+Create/list cubes (CubeCobra import), MTGO accounts, and cube
+instances — see [MTGO accounts, cubes, and instances](#mtgo-accounts-cubes-and-instances)
+above. Each row has an active/inactive toggle.
 
 ### MTGO Administration (`mtgo.html`)
 
@@ -94,9 +155,9 @@ The panel that triggers real actions on the bot's MTGO client.
 
 | Action | What it does |
 |---|---|
-| Trigger give | Creates a session's MTGO binder with each identified player's `PREPARED` cards, then sends them a real trade request exposing it. The player accepts and picks whatever they want via Search Tools; the bot submits and confirms its own side (empty, unless a deposit is required — see below) once they're done. What actually left the bot's account is then verified via export/diff, never by trusting the live trade window. Every card confirmed as given (even if the player didn't take everything) automatically moves `PREPARED` → `DISTRIBUTED`, and the player is immediately DMed the "J'ai reçu ces cartes" button — no need to reopen "Corriger mon pseudo MTGO" to get one. |
-| Trigger return | Sends a trade request to the given MTGO player, waits for them to accept, then retrieves all of their `CONFIRMED` cards for that session (and returns their deposit, if the session has one). |
-| Check cube integrity | Compares the bot's real MTGO collection against the reference inventory (accounting for what's currently on loan) and reports any discrepancy. Read-only, no risk. |
+| Trigger give | Creates a session's MTGO binder with each identified player's `PREPARED` cards, then sends them a real trade request exposing it. The player accepts and picks whatever they want via Search Tools; the bot submits and confirms its own side (empty, unless a deposit is required — see below) once they're done. What actually left the bot's account is then verified via export/diff, never by trusting the live trade window. Every card confirmed as given (even if the player didn't take everything) automatically moves `PREPARED` → `DISTRIBUTED`, and the player is immediately DMed the "J'ai reçu ces cartes" button — no need to reopen "Corriger mon pseudo MTGO" to get one. Automatically routed to the session's MTGO account (see above); fails immediately if that account already has a job running. |
+| Trigger return | Sends a trade request to the given MTGO player, waits for them to accept, then retrieves all of their `CONFIRMED` cards for that session (and returns their deposit, if the session has one). Same account routing/locking as give. |
+| Check cube integrity | Asks for a cube instance ID, compares the real MTGO collection of the account hosting that instance against that same instance's reference inventory (accounting for what's currently on loan), and reports any discrepancy. Read-only, no risk. |
 
 **Recent jobs table**: refreshes automatically every 5 seconds. Each
 row shows the ID, type, status, related session/player, and a
@@ -194,7 +255,7 @@ admins." (Admins only.) message instead of failing silently.
 |---|---|
 | `/mtgo-give <session_id>` | Discord equivalent of the dashboard's "Déclencher la distribution" button. |
 | `/mtgo-return <session_id> <mtgo_username>` | Equivalent of "Déclencher la récupération". |
-| `/mtgo-integrity-check` | Equivalent of "Vérifier l'intégrité du cube". |
+| `/mtgo-integrity-check <cube_instance_id>` | Equivalent of "Vérifier l'intégrité du cube". |
 | `/mtgo-job-status <job_id>` | Checks the status and latest log lines of a running or past job — useful if the initial notification was dismissed, or if the bot restarted while waiting. |
 
 After a trigger (`/mtgo-give`, `/mtgo-return`,
@@ -216,7 +277,7 @@ l'excédent") as the dashboard.
 | `BACKEND_API_URL` | Backend URL, defaults to `http://localhost:8000`. |
 | `DISCORD_CATEGORY_NAME` | Category where session channels are created, defaults to `Automated Draft on MTGO`. |
 | `CLEANUP_INTERVAL_MINUTES` | How often finished channels are cleaned up, defaults to 2 minutes. |
-| `MTGO_USERNAME` / `MTGO_PASSWORD` | The bot's MTGO account, used by the automation scripts. |
+| `MTGO_USERNAME` / `MTGO_PASSWORD` | Default MTGO account, used by the automation scripts. The backend overrides `MTGO_USERNAME` per job based on the targeted cube instance (see "MTGO accounts, cubes, and instances"); this value is only a fallback and used for the initial login (`ensure_ready.py`, still single-account). |
 
 **Backend** (process environment variables, no `.env` file on the
 backend side):
@@ -233,19 +294,20 @@ the server's "Administrator" permission.
 
 ## Populating inventory from a real MTGO export
 
-The cube integrity check compares the real MTGO collection against the
-backend's `/inventory/` table — it's only reliable if that table
-reflects the full cube. To (re)populate it from a real "Full Trade
-List" export:
+The cube integrity check compares the real MTGO collection against a
+given cube instance's inventory — it's only reliable if that
+instance's inventory reflects the full cube. To (re)populate it from a
+real "Full Trade List" export:
 
 ```
-.venv/Scripts/python.exe scripts/import_inventory_from_dek.py <path-to-.dek>
+.venv/Scripts/python.exe scripts/import_inventory_from_dek.py <cube_instance_id> <path-to-.dek>
 ```
 
 Creates any missing cards, updates owned quantities for every card
-present in the export, and zeroes out any inventory card absent from
-the export (stale test data, a card removed from the cube, etc.).
-Re-run it whenever the cube's composition changes.
+present in the export **for that instance**, and zeroes out any
+inventory card on that instance absent from the export (stale test
+data, a card removed from the cube, etc.) — other instances are
+unaffected. Re-run it whenever the cube's composition changes.
 
 ## Production reliability
 

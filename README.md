@@ -5,6 +5,12 @@ Online entre joueurs lors d'un draft : suivi des sessions de prêt,
 distribution et récupération réelles des cartes sur MTGO, le tout
 piloté depuis Discord et un dashboard web.
 
+Gère plusieurs comptes MTGO, plusieurs cubes, et plusieurs instances
+(copies physiques) d'un même cube en parallèle — chaque compte est un
+simple agent de manipulation de cartes et lieu de stockage, avec son
+propre pool d'inventaire et son propre verrou d'exécution (voir
+[Comptes, cubes et instances](#comptes-cubes-et-instances) plus bas).
+
 ## Architecture
 
 Trois composants qui communiquent via l'API HTTP du backend — rien
@@ -23,7 +29,40 @@ d'autre ne touche la base de données directement :
 Toute action qui touche réellement MTGO passe par un **job** asynchrone
 (`PENDING` → `RUNNING` → `SUCCEEDED`/`FAILED`) : le backend spawn un
 sous-processus Python dans `agent/` qui pilote le client MTGO en temps
-réel, le temps qu'un joueur accepte un échange.
+réel, le temps qu'un joueur accepte un échange. Chaque job est routé
+vers le bon compte MTGO (variable d'environnement `MTGO_USERNAME`
+injectée dans le sous-processus) et un verrou en mémoire empêche deux
+jobs de piloter la même fenêtre MTGO en même temps.
+
+## Comptes, cubes et instances
+
+Un **`MtgoAccount`** est une simple identité de connexion MTGO (nom +
+pseudo MTGO), sans notion de cube attachée. Un **`Cube`** est la
+composition de référence d'un cube (importée depuis CubeCobra). Une
+**`CubeInstance`** relie les deux — c'est elle qui porte réellement
+l'inventaire (`InventoryItem`) et les sessions de prêt
+(`LoanSession.cube_instance_id`) :
+
+- plusieurs comptes peuvent chacun héberger un cube différent ;
+- un même compte peut héberger plusieurs cubes différents ;
+- un même compte peut héberger plusieurs instances du **même** cube
+  (deux copies physiques suivies comme deux pools d'inventaire
+  séparés, pour faire tourner deux drafts en parallèle sans se marcher
+  dessus).
+
+Gestion via le dashboard (`accounts.html`) ou l'API (`/cubes/`,
+`/mtgo/accounts/`, `/mtgo/cube-instances/`). Toute session, tout job
+MTGO, et l'inventaire lui-même sont scopés à une `cube_instance_id` —
+voir [docs/admin-guide.md](docs/admin-guide.md) pour le détail des
+endpoints.
+
+**Limite connue** : le login MTGO (`agent/mtgo/ensure_ready.py`) reste
+mono-compte pour l'instant — `agent/.env` ne porte qu'un seul
+`MTGO_USERNAME`/`MTGO_PASSWORD`. Le routage des jobs vers plusieurs
+comptes fonctionne dès lors que chaque compte est déjà connecté sur le
+client MTGO ; la gestion des identifiants pour se connecter
+automatiquement à plusieurs comptes n'est pas encore implémentée
+(aucun mot de passe n'est stocké en base, par design).
 
 ## Démarrage rapide
 
