@@ -13,7 +13,15 @@ logger = logging.getLogger(__name__)
 
 TERMINAL_JOB_STATUSES = ("SUCCEEDED", "FAILED")
 POLL_INTERVAL_SECONDS = 5
-POLL_MAX_ATTEMPTS = 120  # ~10 minutes, generous since a return trade needs a live human to accept
+# ~1 hour. A GIVE job processes every player in the session sequentially
+# in one run (prepare_session_binders.py loops player by player, each
+# waiting up to several minutes for a live human to accept/pick/confirm)
+# — with more than a couple of players, 10 minutes (the old value) can
+# run out before the job finishes. If polling gives up before the job
+# reaches a terminal status, _notify_affected_players/
+# _notify_distributed_players below never fire even though the job
+# completes fine server-side — players silently never get their DM.
+POLL_MAX_ATTEMPTS = 720
 
 
 def _format_reconciliation(reconciliation: dict) -> str:
@@ -337,11 +345,24 @@ class MtgoAdminCog(commands.Cog):
             await self._notify_affected_players(job)
             await self._notify_distributed_players(job)
 
-        await interaction.followup.send(
-            f"Job #{job['id']} ({job['job_type']}) — {message}",
-            ephemeral=True,
-            view=view,
-        )
+        try:
+            await interaction.followup.send(
+                f"Job #{job['id']} ({job['job_type']}) — {message}",
+                ephemeral=True,
+                view=view,
+            )
+        except discord.HTTPException:
+            # Discord invalidates an interaction's followup webhook token
+            # after ~15 minutes — a GIVE job with several sequential
+            # players can outlive that easily. The notifications above
+            # already went out (they use bot.fetch_user, not this token),
+            # so this is just the admin's ephemeral "done" reply failing
+            # to deliver — not a lost result. /mtgo-job-status still works.
+            logger.warning(
+                "Impossible d'envoyer le compte-rendu du job %s (token d'interaction "
+                "probablement expiré) — utilisez /mtgo-job-status pour le consulter.",
+                job["id"],
+            )
 
     @app_commands.command(
         name="mtgo-give",
