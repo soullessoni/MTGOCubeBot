@@ -238,17 +238,65 @@ def export_full_trade_list(window, save_path: Path, timeout: float = 15.0) -> Pa
     reliably when called on the tree-view element (`window_text() ==
     MEGABINDER_ROW_TEXT`) directly — right-clicking via raw screen
     coordinates on the icon-gallery tile below (which visually also
-    shows an "Export" hover button) was unreliable in practice."""
+    shows an "Export" hover button) was unreliable in practice.
+
+    **Collapsed-section gotcha confirmed live 2026-08-11**: the "Trade
+    Binders" tree group can be collapsed (its default/last-session
+    state on a normal player account, unlike a heavily-automated
+    account left expanded from repeated prior use) — when collapsed,
+    none of its binder rows exist in the UIA tree at all, so the search
+    below raises even though the account genuinely has a Full Trade
+    List. Fix: if the row isn't found, click the "Trade Binders" header
+    once to expand it and retry before giving up.
+
+    **KNOWN UNRESOLVED as of 2026-08-11**: on top of the above, an
+    account whose Full Trade List hadn't been opened yet this MTGO
+    session can get the row's right-click menu stuck showing only "This
+    binder cannot be edited or deleted." — no Export item — even once
+    the binder is confirmed fully loaded (its card count renders
+    correctly). This was reproduced live on FruitDuChene and did NOT
+    clear via: expanding the section, re-fetching a fresh row reference
+    before right-clicking, waiting up to 4 minutes, opening the binder
+    first via double-click, or repeated collapse/expand click_input()
+    cycles (confirmed those clicks don't even toggle the section — the
+    row stayed present throughout). What DOES work, confirmed manually
+    by the account's owner: the separate "Decks & Binders" icon-gallery
+    view (reached by clicking the "Trade Binders" group header, showing
+    Full Trade List as one of several book-icon tiles alongside Wish
+    List / Full Collection / Sellings) has its own hover-revealed
+    "Export" button on the tile, independent of the tree row's context
+    menu, and that path exported successfully. Automating a reliable
+    click on that specific gallery tile (vs. the many identically-typed
+    card tiles that appear once a binder is open) was not solved this
+    session — see the `mtgo_automation_mechanics` memory / session notes
+    for what was tried. Until this is fixed, `export_full_trade_list`
+    only works reliably on accounts whose Full Trade List has already
+    been opened at least once this MTGO session."""
     window.set_focus()
-    target = None
-    for element in window.descendants():
-        try:
-            text = element.window_text()
-        except Exception:
-            continue
-        if text == MEGABINDER_ROW_TEXT:
-            target = element
-            break
+
+    def _find_megabinder_row():
+        for element in window.descendants():
+            try:
+                text = element.window_text()
+            except Exception:
+                continue
+            if text == MEGABINDER_ROW_TEXT:
+                return element
+        return None
+
+    target = _find_megabinder_row()
+    if target is None:
+        for element in window.descendants():
+            try:
+                text = element.window_text()
+                control = element.friendly_class_name()
+            except Exception:
+                continue
+            if control == "Custom" and text == "Trade Binders":
+                element.click_input()
+                time.sleep(2.5)
+                break
+        target = _find_megabinder_row()
     if target is None:
         raise MtgoAutomationError("'Full Trade List' row not found")
 

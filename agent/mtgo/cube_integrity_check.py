@@ -23,13 +23,19 @@ process_session_returns.py's docstring for why this convention exists
 
 import os
 import sys
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
 
 from mtgo.cli_common import BACKEND_API_URL, enable_utf8_stdout, print_result
-from mtgo.client import export_full_trade_list, find_mtgo_window
+from mtgo.client import (
+    export_full_trade_list,
+    find_by_automation_id,
+    find_mtgo_window,
+    select_cards_filter,
+)
 from mtgo.stock_check import (
     HANDED_OUT_STATUSES,
     compute_expected_quantities,
@@ -92,7 +98,24 @@ def main():
             print_result({"ok": False, "error": "MTGO window not found."})
             return 1
 
-        export_path = export_full_trade_list(window, Path("mtgo/lists/_integrity_check.dek"))
+        window.set_focus()
+        collection_btn = find_by_automation_id(window, "CollectionButton")
+        if collection_btn is not None:
+            collection_btn.click_input()
+            time.sleep(2.0)
+
+        # Defensive: if a prior session left the "Other Products" filter
+        # active on this account, the "Full Trade List" row lookup below
+        # can't find it — confirmed live 2026-07-29 for the give flow,
+        # same fix applies here.
+        try:
+            select_cards_filter(window)
+        except Exception:
+            pass
+
+        export_path = export_full_trade_list(
+            window, Path(f"mtgo/lists/_integrity_check_{cube_instance_id}.dek")
+        )
         actual = parse_dek_quantities(export_path)
 
         diff = diff_stock(expected, actual)
