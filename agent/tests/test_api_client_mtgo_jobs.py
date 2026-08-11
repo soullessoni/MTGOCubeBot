@@ -55,14 +55,19 @@ async def test_trigger_return_posts_mtgo_username():
 
 
 async def test_trigger_integrity_check():
+    captured = {}
+
     def handler(request):
-        assert request.url.path == "/mtgo/integrity-check"
+        captured["path"] = request.url.path
+        captured["body"] = json.loads(request.content)
         return httpx.Response(200, json={"id": 3, "job_type": "INTEGRITY_CHECK", "status": "PENDING"})
 
     client = make_client(handler)
 
-    result = await client.trigger_integrity_check(requested_by="discord:1")
+    result = await client.trigger_integrity_check(cube_instance_id=1, requested_by="discord:1")
 
+    assert captured["path"] == "/mtgo/integrity-check"
+    assert captured["body"] == {"cube_instance_id": 1, "requested_by": "discord:1"}
     assert result["job_type"] == "INTEGRITY_CHECK"
 
 
@@ -78,6 +83,7 @@ async def test_trigger_give_back_sends_cards():
     result = await client.trigger_give_back(
         "FruitDuChene",
         {"Mulldrifter": 1},
+        cube_instance_id=1,
         requested_by="discord:1",
         retry_of_job_id=2,
     )
@@ -85,6 +91,7 @@ async def test_trigger_give_back_sends_cards():
     assert captured["body"] == {
         "mtgo_username": "FruitDuChene",
         "cards": {"Mulldrifter": 1},
+        "cube_instance_id": 1,
         "requested_by": "discord:1",
         "retry_of_job_id": 2,
     }

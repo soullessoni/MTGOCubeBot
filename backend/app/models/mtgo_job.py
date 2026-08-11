@@ -35,6 +35,17 @@ class MtgoJob(Base):
         index=True,
     )
 
+    # Which physical pool this job's automation drives — resolves to a
+    # specific MtgoAccount (via CubeInstance.mtgo_account_id) so the
+    # runner knows which MTGO window to target. Nullable because a job
+    # type this hasn't been wired for yet just falls back to whatever
+    # window is already open (single-account behavior).
+    cube_instance_id = Column(
+        Integer,
+        ForeignKey("cube_instances.id"),
+        nullable=True,
+    )
+
     mtgo_username = Column(
         String(255),
         nullable=True,

@@ -86,6 +86,7 @@ class GiveBackButton(discord.ui.Button):
             mtgo_username: str,
             cards: dict,
             original_job_id: int,
+            cube_instance_id: int | None = None,
     ):
         super().__init__(
             label="Rendre l'excédent",
@@ -95,6 +96,7 @@ class GiveBackButton(discord.ui.Button):
         self.mtgo_username = mtgo_username
         self.cards = cards
         self.original_job_id = original_job_id
+        self.cube_instance_id = cube_instance_id
 
     async def callback(self, interaction: discord.Interaction):
         if not user_is_admin(interaction.user):
@@ -107,6 +109,7 @@ class GiveBackButton(discord.ui.Button):
             job = await self.api_client.trigger_give_back(
                 self.mtgo_username,
                 self.cards,
+                cube_instance_id=self.cube_instance_id,
                 requested_by=f"discord:{interaction.user.id}",
                 retry_of_job_id=self.original_job_id,
             )
@@ -135,6 +138,7 @@ class CorrectiveActionView(discord.ui.View):
                 job["mtgo_username"],
                 reconciliation["to_give_back"],
                 job["id"],
+                cube_instance_id=job.get("cube_instance_id"),
             ))
 
 
@@ -415,14 +419,19 @@ class MtgoAdminCog(commands.Cog):
         name="mtgo-integrity-check",
         description="Vérifie l'intégrité du cube face à la référence",
     )
+    @app_commands.describe(
+        cube_instance_id="Instance de cube (compte/copie) à vérifier",
+    )
     @is_admin()
     async def mtgo_integrity_check(
             self,
             interaction: discord.Interaction,
+            cube_instance_id: int,
     ):
         await self._trigger_and_poll(
             interaction,
             self.api_client.trigger_integrity_check(
+                cube_instance_id=cube_instance_id,
                 requested_by=f"discord:{interaction.user.id}",
             ),
             "vérification d'intégrité",

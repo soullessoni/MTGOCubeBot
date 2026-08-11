@@ -8,6 +8,7 @@ class MtgoJobResponse(BaseModel):
     job_type: str
     status: str
     session_id: int | None = None
+    cube_instance_id: int | None = None
     mtgo_username: str | None = None
     params: dict | None = None
     result: dict | None = None
@@ -34,12 +35,14 @@ class TriggerReturnRequest(BaseModel):
 
 
 class TriggerIntegrityCheckRequest(BaseModel):
+    cube_instance_id: int
     requested_by: str | None = None
 
 
 class TriggerGiveBackRequest(BaseModel):
     mtgo_username: str
     cards: dict[str, int]
+    cube_instance_id: int | None = None
     requested_by: str | None = None
     retry_of_job_id: int | None = None
 

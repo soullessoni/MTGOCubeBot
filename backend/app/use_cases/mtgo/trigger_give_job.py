@@ -1,4 +1,5 @@
 from app.models.mtgo_job import MtgoJob
+from app.services.mtgo.mtgo_account_resolver import resolve_mtgo_account
 from app.services.mtgo.mtgo_job_argv import build_job_argv
 from app.services.mtgo.mtgo_job_service import MtgoJobService
 
@@ -16,11 +17,13 @@ class TriggerGiveJobUseCase:
     def execute(
             self,
             session_id: int,
+            cube_instance_id: int | None = None,
             requested_by: str | None = None,
     ) -> MtgoJob:
         job = self.job_service.create(
             job_type="GIVE",
             session_id=session_id,
+            cube_instance_id=cube_instance_id,
             requested_by=requested_by,
         )
 
@@ -29,9 +32,22 @@ class TriggerGiveJobUseCase:
             session_id=session_id,
         )
 
-        self.runner.start(
+        mtgo_account_id, mtgo_account_username = resolve_mtgo_account(
+            self.job_service.db,
+            cube_instance_id,
+        )
+
+        started = self.runner.start(
             job.id,
             argv,
+            mtgo_account_id=mtgo_account_id,
+            mtgo_account_username=mtgo_account_username,
         )
+
+        if not started:
+            return self.job_service.mark_failed(
+                job,
+                "Le compte MTGO ciblé est déjà occupé par un autre job.",
+            )
 
         return job

@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 from app.models.mtgo_job import MtgoJob
 
 
@@ -13,6 +15,7 @@ class MtgoJobService:
             self,
             job_type: str,
             session_id: int | None = None,
+            cube_instance_id: int | None = None,
             mtgo_username: str | None = None,
             params: dict | None = None,
             requested_by: str | None = None,
@@ -22,6 +25,7 @@ class MtgoJobService:
             job_type=job_type,
             status="PENDING",
             session_id=session_id,
+            cube_instance_id=cube_instance_id,
             mtgo_username=mtgo_username,
             params=params,
             requested_by=requested_by,
@@ -30,6 +34,20 @@ class MtgoJobService:
         )
 
         self.db.add(job)
+        self.db.commit()
+        self.db.refresh(job)
+
+        return job
+
+    def mark_failed(
+            self,
+            job: MtgoJob,
+            error_message: str,
+    ) -> MtgoJob:
+        job.status = "FAILED"
+        job.error_message = error_message
+        job.finished_at = datetime.now(UTC)
+
         self.db.commit()
         self.db.refresh(job)
 

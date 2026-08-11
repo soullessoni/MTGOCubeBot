@@ -17,10 +17,15 @@ def test_return_argv_targets_process_session_returns():
     assert argv == ["-m", "mtgo.process_session_returns", "7", "FruitDuChene"]
 
 
-def test_integrity_check_argv_takes_no_extra_args():
-    argv = build_job_argv("INTEGRITY_CHECK")
+def test_integrity_check_argv_includes_cube_instance_id():
+    argv = build_job_argv("INTEGRITY_CHECK", cube_instance_id=3)
 
-    assert argv == ["-m", "mtgo.cube_integrity_check"]
+    assert argv == ["-m", "mtgo.cube_integrity_check", "3"]
+
+
+def test_integrity_check_requires_cube_instance_id():
+    with pytest.raises(ValueError):
+        build_job_argv("INTEGRITY_CHECK")
 
 
 def test_give_back_argv_encodes_cards_as_json_and_includes_job_id():

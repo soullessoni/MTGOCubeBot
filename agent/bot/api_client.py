@@ -99,18 +99,23 @@ class CubeBotApiClient:
 
     async def trigger_integrity_check(
             self,
+            cube_instance_id: int,
             requested_by: str | None = None,
     ) -> dict:
         return await self._request(
             "POST",
             "/mtgo/integrity-check",
-            json={"requested_by": requested_by},
+            json={
+                "cube_instance_id": cube_instance_id,
+                "requested_by": requested_by,
+            },
         )
 
     async def trigger_give_back(
             self,
             mtgo_username: str,
             cards: dict[str, int],
+            cube_instance_id: int | None = None,
             requested_by: str | None = None,
             retry_of_job_id: int | None = None,
     ) -> dict:
@@ -120,6 +125,7 @@ class CubeBotApiClient:
             json={
                 "mtgo_username": mtgo_username,
                 "cards": cards,
+                "cube_instance_id": cube_instance_id,
                 "requested_by": requested_by,
                 "retry_of_job_id": retry_of_job_id,
             },

@@ -9,8 +9,9 @@ class FakeRunner:
     def __init__(self):
         self.calls = []
 
-    def start(self, job_id, argv):
+    def start(self, job_id, argv, mtgo_account_id=None, mtgo_account_username=None):
         self.calls.append((job_id, argv))
+        return True
 
 
 @pytest.fixture
@@ -66,13 +67,14 @@ def test_trigger_return_requires_mtgo_username_in_body(client, db_session, cube_
     ]
 
 
-def test_trigger_integrity_check(client, fake_runner):
-    response = client.post("/mtgo/integrity-check", json={})
+def test_trigger_integrity_check(client, cube_instance_id, fake_runner):
+    response = client.post("/mtgo/integrity-check", json={"cube_instance_id": cube_instance_id})
 
     assert response.status_code == 200
     data = response.json()
     assert data["job_type"] == "INTEGRITY_CHECK"
     assert data["session_id"] is None
+    assert data["cube_instance_id"] == cube_instance_id
 
 
 def test_trigger_give_back_rejects_empty_cards(client, fake_runner):

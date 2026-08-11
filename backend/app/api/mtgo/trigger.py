@@ -56,7 +56,7 @@ def trigger_give(
         db: Session = Depends(get_db),
         runner=Depends(get_job_runner),
 ):
-    _get_session_or_404(session_id, db)
+    session = _get_session_or_404(session_id, db)
 
     use_case = TriggerGiveJobUseCase(
         MtgoJobService(db),
@@ -65,6 +65,7 @@ def trigger_give(
 
     return use_case.execute(
         session_id=session_id,
+        cube_instance_id=session.cube_instance_id,
         requested_by=body.requested_by,
     )
 
@@ -79,7 +80,7 @@ def trigger_return(
         db: Session = Depends(get_db),
         runner=Depends(get_job_runner),
 ):
-    _get_session_or_404(session_id, db)
+    session = _get_session_or_404(session_id, db)
 
     use_case = TriggerReturnJobUseCase(
         MtgoJobService(db),
@@ -89,6 +90,7 @@ def trigger_return(
     return use_case.execute(
         session_id=session_id,
         mtgo_username=body.mtgo_username,
+        cube_instance_id=session.cube_instance_id,
         requested_by=body.requested_by,
     )
 
@@ -98,7 +100,7 @@ def trigger_return(
     response_model=MtgoJobResponse,
 )
 def trigger_integrity_check(
-        body: TriggerIntegrityCheckRequest = TriggerIntegrityCheckRequest(),
+        body: TriggerIntegrityCheckRequest,
         db: Session = Depends(get_db),
         runner=Depends(get_job_runner),
 ):
@@ -108,6 +110,7 @@ def trigger_integrity_check(
     )
 
     return use_case.execute(
+        cube_instance_id=body.cube_instance_id,
         requested_by=body.requested_by,
     )
 
@@ -130,6 +133,7 @@ def trigger_give_back(
         return use_case.execute(
             mtgo_username=body.mtgo_username,
             cards=body.cards,
+            cube_instance_id=body.cube_instance_id,
             requested_by=body.requested_by,
             retry_of_job_id=body.retry_of_job_id,
         )

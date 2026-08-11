@@ -4,6 +4,7 @@ import json
 def build_job_argv(
         job_type: str,
         session_id: int | None = None,
+        cube_instance_id: int | None = None,
         mtgo_username: str | None = None,
         params: dict | None = None,
         job_id: int | None = None,
@@ -25,7 +26,10 @@ def build_job_argv(
         return ["-m", "mtgo.process_session_returns", str(session_id), mtgo_username]
 
     if job_type == "INTEGRITY_CHECK":
-        return ["-m", "mtgo.cube_integrity_check"]
+        if cube_instance_id is None:
+            raise ValueError("INTEGRITY_CHECK jobs require cube_instance_id")
+
+        return ["-m", "mtgo.cube_integrity_check", str(cube_instance_id)]
 
     if job_type == "GIVE_BACK":
         if not mtgo_username or not params or not params.get("cards"):

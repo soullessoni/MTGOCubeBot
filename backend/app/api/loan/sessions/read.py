@@ -17,13 +17,14 @@ router = APIRouter(
     response_model=list[LoanSessionResponse],
 )
 def list_loan_sessions(
+        cube_instance_id: int | None = None,
         db: Session = Depends(get_db),
 ):
     service = LoanSessionQueryService(
         db,
     )
 
-    return service.list_all()
+    return service.list_all(cube_instance_id)
 
 
 @router.get(

@@ -4,10 +4,17 @@ out on loan (DISTRIBUTED or CONFIRMED). Read-only — no trade, no write
 to the backend. Reuses `stock_check.py`'s existing primitives entirely.
 
 Usage:
-  .venv/Scripts/python.exe -m mtgo.cube_integrity_check
+  .venv/Scripts/python.exe -m mtgo.cube_integrity_check <cube_instance_id>
+
+`cube_instance_id` identifies which account/cube-copy pool to check —
+the backend now tracks inventory per instance, not as one global pool,
+so this scopes both the expected-quantity baseline and the "what's
+currently on loan" lookup to just that pool.
 
 Requires the backend API running (BACKEND_API_URL, default
-http://localhost:8000) and MTGO_USERNAME set to the bot's own account.
+http://localhost:8000) and MTGO_USERNAME set to the account this
+instance's job was routed to (the backend sets this automatically when
+triggering the job; only matters if running by hand).
 
 Always prints exactly one final JSON line before exiting — see
 process_session_returns.py's docstring for why this convention exists
@@ -31,14 +38,20 @@ from mtgo.stock_check import (
 )
 
 
-def _fetch_inventory() -> list[dict]:
-    response = httpx.get(f"{BACKEND_API_URL}/inventory/")
+def _fetch_inventory(cube_instance_id: int) -> list[dict]:
+    response = httpx.get(
+        f"{BACKEND_API_URL}/inventory/",
+        params={"cube_instance_id": cube_instance_id},
+    )
     response.raise_for_status()
     return response.json()
 
 
-def _fetch_active_loan_card_names() -> list[str]:
-    response = httpx.get(f"{BACKEND_API_URL}/loan/sessions/")
+def _fetch_active_loan_card_names(cube_instance_id: int) -> list[str]:
+    response = httpx.get(
+        f"{BACKEND_API_URL}/loan/sessions/",
+        params={"cube_instance_id": cube_instance_id},
+    )
     response.raise_for_status()
 
     names = []
@@ -61,9 +74,16 @@ def build_result(diff: dict, checked_at: str) -> dict:
 def main():
     enable_utf8_stdout()
 
+    if len(sys.argv) != 2:
+        print("Usage: python -m mtgo.cube_integrity_check <cube_instance_id>")
+        print_result({"ok": False, "error": "usage: <cube_instance_id> required"})
+        return 1
+
+    cube_instance_id = int(sys.argv[1])
+
     try:
-        inventory = _fetch_inventory()
-        active_loan_card_names = _fetch_active_loan_card_names()
+        inventory = _fetch_inventory(cube_instance_id)
+        active_loan_card_names = _fetch_active_loan_card_names(cube_instance_id)
         expected = compute_expected_quantities(inventory, active_loan_card_names)
 
         window = find_mtgo_window(os.environ.get("MTGO_USERNAME"))

@@ -24,12 +24,24 @@ class LoanSessionQueryService:
             .first()
         )
 
-    def list_all(self) -> list[LoanSession]:
-        return (
+    def list_all(
+            self,
+            cube_instance_id: int | None = None,
+    ) -> list[LoanSession]:
+        query = (
             self.db.query(LoanSession)
             .options(
                 selectinload(LoanSession.assignments).selectinload(LoanAssignment.card)
             )
+        )
+
+        if cube_instance_id is not None:
+            query = query.filter(
+                LoanSession.cube_instance_id == cube_instance_id
+            )
+
+        return (
+            query
             .order_by(
                 LoanSession.created_at.desc()
             )

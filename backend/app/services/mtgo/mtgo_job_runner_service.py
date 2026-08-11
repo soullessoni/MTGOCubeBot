@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import threading
 import time
@@ -71,16 +72,47 @@ class MtgoJobRunnerService:
     ):
         self.config = config
         self.notifier = notifier
+        # Guards concurrent automation against the same MTGO account: two
+        # jobs racing to drive the same already-open MTGO window via
+        # pywinauto would corrupt each other's clicks. Keyed by
+        # mtgo_account_id (not cube_instance_id) since two instances of
+        # the same cube on one account still share a single window.
+        self._account_lock = threading.Lock()
+        self._busy_account_ids: set[int] = set()
 
-    def start(self, job_id: int, argv: list[str]) -> None:
+    def start(
+            self,
+            job_id: int,
+            argv: list[str],
+            mtgo_account_id: int | None = None,
+            mtgo_account_username: str | None = None,
+    ) -> bool:
+        """Returns False (and does not start anything) if
+        `mtgo_account_id` is already driving another job — the caller is
+        expected to mark the job FAILED in that case. A `None` account id
+        (job types not yet routed to a specific account) is never
+        treated as busy."""
+        if mtgo_account_id is not None:
+            with self._account_lock:
+                if mtgo_account_id in self._busy_account_ids:
+                    return False
+                self._busy_account_ids.add(mtgo_account_id)
+
         thread = threading.Thread(
             target=self._run,
-            args=(job_id, argv),
+            args=(job_id, argv, mtgo_account_id, mtgo_account_username),
             daemon=True,
         )
         thread.start()
+        return True
 
-    def _run(self, job_id: int, argv: list[str]) -> None:
+    def _run(
+            self,
+            job_id: int,
+            argv: list[str],
+            mtgo_account_id: int | None = None,
+            mtgo_account_username: str | None = None,
+    ) -> None:
         db = SessionLocal()
         job = None
 
@@ -90,12 +122,17 @@ class MtgoJobRunnerService:
             job.started_at = datetime.now(UTC)
             db.commit()
 
+            env = None
+            if mtgo_account_username:
+                env = {**os.environ, "MTGO_USERNAME": mtgo_account_username}
+
             process = subprocess.Popen(
                 [str(self.config.agent_python), *argv],
                 cwd=str(self.config.agent_cwd),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                env=env,
             )
 
             output_lines: list[str] = []
@@ -130,6 +167,10 @@ class MtgoJobRunnerService:
             job.finished_at = datetime.now(UTC)
             db.commit()
         finally:
+            if mtgo_account_id is not None:
+                with self._account_lock:
+                    self._busy_account_ids.discard(mtgo_account_id)
+
             # Notified only after the terminal status is safely committed —
             # `notifier.notify` guarantees it never raises, but it also
             # lives outside the try/except above on purpose, so a bug in

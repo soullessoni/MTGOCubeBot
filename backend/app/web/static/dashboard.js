@@ -399,9 +399,17 @@ async function renderMtgoAdmin() {
 
     document.getElementById("integrity-check-btn").addEventListener("click", async () => {
         clearError();
+        const cubeInstanceId = document.getElementById("integrity-check-cube-instance-id").value;
+
+        if (!cubeInstanceId) {
+            showError("ID d'instance de cube requis.");
+            return;
+        }
 
         try {
-            const job = await apiPost(`${MTGO_API_BASE}/integrity-check`);
+            const job = await apiPostJson(`${MTGO_API_BASE}/integrity-check`, {
+                cube_instance_id: parseInt(cubeInstanceId, 10),
+            });
             selectedMtgoJobId = job.id;
             await renderJobsTable();
             await renderJobDetail(job.id);
@@ -502,6 +510,7 @@ function renderReconciliationSection(reconciliation, job) {
         html += "</ul>";
         html += `<button class="give-back-btn btn-danger" data-job-id="${job.id}" `
             + `data-mtgo-username="${job.mtgo_username}" `
+            + `data-cube-instance-id="${job.cube_instance_id ?? ""}" `
             + `data-cards='${JSON.stringify(toGiveBack)}'>Rendre l'excédent</button>`;
     }
 
@@ -571,9 +580,11 @@ function wireCorrectiveActionButtons(container) {
 
             try {
                 const cards = JSON.parse(giveBackBtn.dataset.cards);
+                const cubeInstanceId = giveBackBtn.dataset.cubeInstanceId;
                 const newJob = await apiPostJson(`${MTGO_API_BASE}/give-back`, {
                     mtgo_username: giveBackBtn.dataset.mtgoUsername,
                     cards: cards,
+                    cube_instance_id: cubeInstanceId ? parseInt(cubeInstanceId, 10) : null,
                     retry_of_job_id: parseInt(giveBackBtn.dataset.jobId, 10),
                 });
                 selectedMtgoJobId = newJob.id;
