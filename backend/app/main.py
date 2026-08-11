@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from app.exceptions.loan import CardNotFoundError
 
+from app.api.cubes import cubes_router
 from app.api.inventory import inventory_router
 from app.api.loan import (
     sessions_router,
@@ -32,6 +33,10 @@ app.include_router(
 
 app.include_router(
     mtgo_router,
+)
+
+app.include_router(
+    cubes_router,
 )
 
 

@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8"/>
+    <title>MTGO CubeBot — Comptes MTGO</title>
+    <link rel="stylesheet" href="dashboard.css"/>
+</head>
+<body>
+<header>
+    <a href="index.html">&larr; Sessions</a>
+    <h1>Comptes MTGO</h1>
+    <button id="refresh-btn">Rafraîchir</button>
+</header>
+<main>
+    <p id="error-message" class="error" hidden></p>
+
+    <section class="mtgo-trigger-section">
+        <fieldset>
+            <legend>Nouveau cube (import CubeCobra)</legend>
+            <input type="text" id="cube-name" placeholder="Nom du cube"/>
+            <input type="text" id="cube-url" placeholder="URL CubeCobra (cube/list/...)"/>
+            <button id="create-cube-btn">Importer le cube</button>
+        </fieldset>
+
+        <fieldset>
+            <legend>Nouveau compte MTGO</legend>
+            <input type="text" id="account-name" placeholder="Nom (libre)"/>
+            <input type="text" id="account-username" placeholder="Pseudo MTGO exact"/>
+            <button id="create-account-btn">Créer le compte</button>
+        </fieldset>
+
+        <fieldset>
+            <legend>Nouvelle instance de cube</legend>
+            <select id="instance-cube-id"></select>
+            <select id="instance-account-id"></select>
+            <input type="text" id="instance-label" placeholder="Étiquette (ex : Instance A)"/>
+            <button id="create-instance-btn">Créer l'instance</button>
+        </fieldset>
+    </section>
+
+    <h2>Cubes</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nom</th>
+            <th>URL CubeCobra</th>
+        </tr>
+        </thead>
+        <tbody id="cubes-body"></tbody>
+    </table>
+
+    <h2>Comptes</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Nom</th>
+            <th>Pseudo MTGO</th>
+            <th>Statut</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody id="accounts-body"></tbody>
+    </table>
+
+    <h2>Instances de cube</h2>
+    <table>
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Cube</th>
+            <th>Compte</th>
+            <th>Étiquette</th>
+            <th>Statut</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody id="cube-instances-body"></tbody>
+    </table>
+</main>
+<script src="dashboard.js"></script>
+<script>
+    document.getElementById("refresh-btn").addEventListener("click", renderAccountsPage);
+    renderAccountsPage();
+</script>
+</body>
+</html>

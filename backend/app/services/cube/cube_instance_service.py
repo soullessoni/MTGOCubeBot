@@ -39,6 +39,15 @@ class CubeInstanceService:
             .first()
         )
 
+    def list_all(
+            self,
+    ) -> list[CubeInstance]:
+        return (
+            self.db.query(CubeInstance)
+            .order_by(CubeInstance.id)
+            .all()
+        )
+
     def list_for_account(
             self,
             mtgo_account_id: int,

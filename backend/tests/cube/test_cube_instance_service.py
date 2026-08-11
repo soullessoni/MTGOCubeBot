@@ -122,6 +122,21 @@ def test_list_for_cube_returns_instances_across_accounts(db_session):
     assert {i.mtgo_account_id for i in result} == {account_a.id, account_b.id}
 
 
+def test_list_all_returns_every_instance(db_session):
+    cube_a = _make_cube(db_session, "Vintage Cube")
+    cube_b = _make_cube(db_session, "Legacy Cube")
+    account_a = _make_account(db_session, "TheLegionCube")
+    account_b = _make_account(db_session, "FruitDuChene")
+    service = CubeInstanceService(db_session)
+
+    first = service.create(cube_a.id, account_a.id, label="Main")
+    second = service.create(cube_b.id, account_b.id, label="Main")
+
+    result = service.list_all()
+
+    assert [i.id for i in result] == [first.id, second.id]
+
+
 def test_get_returns_none_for_missing_instance(db_session):
     service = CubeInstanceService(db_session)
 

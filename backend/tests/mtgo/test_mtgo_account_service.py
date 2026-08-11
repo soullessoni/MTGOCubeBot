@@ -33,6 +33,17 @@ def test_get_by_username_returns_none_when_not_found(db_session):
     assert service.get_by_username("NoSuchAccount") is None
 
 
+def test_list_all_includes_inactive_accounts(db_session):
+    service = MtgoAccountService(db_session)
+    active_account = service.create("TheLegionCube", "TheLegionCube")
+    inactive_account = service.create("RetiredAccount", "RetiredAccount")
+    service.set_active(inactive_account, False)
+
+    result = service.list_all()
+
+    assert [a.id for a in result] == [active_account.id, inactive_account.id]
+
+
 def test_list_active_excludes_inactive_accounts(db_session):
     service = MtgoAccountService(db_session)
     active_account = service.create("TheLegionCube", "TheLegionCube")

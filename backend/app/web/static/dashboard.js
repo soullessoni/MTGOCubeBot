@@ -1,6 +1,9 @@
 const API_BASE = "/loan/sessions";
 const INVENTORY_API_BASE = "/inventory";
 const MTGO_API_BASE = "/mtgo";
+const CUBES_API_BASE = "/cubes";
+const ACCOUNTS_API_BASE = "/mtgo/accounts";
+const CUBE_INSTANCES_API_BASE = "/mtgo/cube-instances";
 
 const SESSION_ACTIONS = {
     CREATED: {label: "Marquer prête", endpoint: "ready"},
@@ -64,6 +67,21 @@ async function apiPut(path, body) {
 async function apiPostJson(path, body) {
     const response = await fetch(path, {
         method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(body),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        throw new Error(data.detail || `Erreur ${response.status}`);
+    }
+
+    return data;
+}
+
+async function apiPatchJson(path, body) {
+    const response = await fetch(path, {
+        method: "PATCH",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify(body),
     });
@@ -634,4 +652,165 @@ async function renderJobDetail(jobId) {
 
     container.innerHTML = html;
     wireCorrectiveActionButtons(container);
+}
+
+async function renderAccountsPage() {
+    clearError();
+
+    let cubes, accounts, instances;
+
+    try {
+        [cubes, accounts, instances] = await Promise.all([
+            apiGet(`${CUBES_API_BASE}/`),
+            apiGet(`${ACCOUNTS_API_BASE}/`),
+            apiGet(`${CUBE_INSTANCES_API_BASE}/`),
+        ]);
+    } catch (err) {
+        showError("Impossible de charger les comptes/cubes/instances.");
+        return;
+    }
+
+    renderCubesTable(cubes);
+    renderAccountsTable(accounts);
+    renderCubeInstancesTable(instances, cubes, accounts);
+    populateInstanceFormSelects(cubes, accounts);
+    wireAccountsPageForms();
+}
+
+function renderCubesTable(cubes) {
+    const tbody = document.getElementById("cubes-body");
+    tbody.innerHTML = cubes.map((cube) => `
+        <tr>
+            <td>#${cube.id}</td>
+            <td>${cube.name}</td>
+            <td>${cube.cubecobra_url}</td>
+        </tr>
+    `).join("");
+}
+
+function renderAccountsTable(accounts) {
+    const tbody = document.getElementById("accounts-body");
+    tbody.innerHTML = accounts.map((account) => `
+        <tr>
+            <td>#${account.id}</td>
+            <td>${account.name}</td>
+            <td>${account.mtgo_username}</td>
+            <td><span class="${statusBadgeClass(account.active ? "active" : "inactive")}">${account.active ? "Actif" : "Inactif"}</span></td>
+            <td><button class="toggle-account-btn" data-account-id="${account.id}" data-active="${account.active}">${account.active ? "Désactiver" : "Activer"}</button></td>
+        </tr>
+    `).join("");
+
+    tbody.querySelectorAll(".toggle-account-btn").forEach((button) => {
+        button.addEventListener("click", async () => {
+            clearError();
+            const nextActive = button.dataset.active !== "true";
+
+            try {
+                await apiPatchJson(`${ACCOUNTS_API_BASE}/${button.dataset.accountId}/active`, {active: nextActive});
+                await renderAccountsPage();
+            } catch (err) {
+                showError(err.message);
+            }
+        });
+    });
+}
+
+function renderCubeInstancesTable(instances, cubes, accounts) {
+    const cubeNameById = Object.fromEntries(cubes.map((c) => [c.id, c.name]));
+    const accountNameById = Object.fromEntries(accounts.map((a) => [a.id, a.name]));
+
+    const tbody = document.getElementById("cube-instances-body");
+    tbody.innerHTML = instances.map((instance) => `
+        <tr>
+            <td>#${instance.id}</td>
+            <td>${cubeNameById[instance.cube_id] || `Cube #${instance.cube_id}`}</td>
+            <td>${accountNameById[instance.mtgo_account_id] || `Compte #${instance.mtgo_account_id}`}</td>
+            <td>${instance.label}</td>
+            <td><span class="${statusBadgeClass(instance.active ? "active" : "inactive")}">${instance.active ? "Actif" : "Inactif"}</span></td>
+            <td><button class="toggle-instance-btn" data-instance-id="${instance.id}" data-active="${instance.active}">${instance.active ? "Désactiver" : "Activer"}</button></td>
+        </tr>
+    `).join("");
+
+    tbody.querySelectorAll(".toggle-instance-btn").forEach((button) => {
+        button.addEventListener("click", async () => {
+            clearError();
+            const nextActive = button.dataset.active !== "true";
+
+            try {
+                await apiPatchJson(`${CUBE_INSTANCES_API_BASE}/${button.dataset.instanceId}/active`, {active: nextActive});
+                await renderAccountsPage();
+            } catch (err) {
+                showError(err.message);
+            }
+        });
+    });
+}
+
+function populateInstanceFormSelects(cubes, accounts) {
+    const cubeSelect = document.getElementById("instance-cube-id");
+    const accountSelect = document.getElementById("instance-account-id");
+
+    cubeSelect.innerHTML = cubes.map((c) => `<option value="${c.id}">${c.name}</option>`).join("");
+    accountSelect.innerHTML = accounts.map((a) => `<option value="${a.id}">${a.name}</option>`).join("");
+}
+
+function wireAccountsPageForms() {
+    document.getElementById("create-cube-btn").onclick = async () => {
+        clearError();
+        const name = document.getElementById("cube-name").value;
+        const cubeUrl = document.getElementById("cube-url").value;
+
+        if (!name || !cubeUrl) {
+            showError("Nom et URL CubeCobra requis.");
+            return;
+        }
+
+        try {
+            await apiPostJson(`${CUBES_API_BASE}/`, {name, cube_url: cubeUrl});
+            await renderAccountsPage();
+        } catch (err) {
+            showError(err.message);
+        }
+    };
+
+    document.getElementById("create-account-btn").onclick = async () => {
+        clearError();
+        const name = document.getElementById("account-name").value;
+        const mtgoUsername = document.getElementById("account-username").value;
+
+        if (!name || !mtgoUsername) {
+            showError("Nom et pseudo MTGO requis.");
+            return;
+        }
+
+        try {
+            await apiPostJson(`${ACCOUNTS_API_BASE}/`, {name, mtgo_username: mtgoUsername});
+            await renderAccountsPage();
+        } catch (err) {
+            showError(err.message);
+        }
+    };
+
+    document.getElementById("create-instance-btn").onclick = async () => {
+        clearError();
+        const cubeId = document.getElementById("instance-cube-id").value;
+        const accountId = document.getElementById("instance-account-id").value;
+        const label = document.getElementById("instance-label").value;
+
+        if (!cubeId || !accountId || !label) {
+            showError("Cube, compte et étiquette requis.");
+            return;
+        }
+
+        try {
+            await apiPostJson(`${CUBE_INSTANCES_API_BASE}/`, {
+                cube_id: parseInt(cubeId, 10),
+                mtgo_account_id: parseInt(accountId, 10),
+                label,
+            });
+            await renderAccountsPage();
+        } catch (err) {
+            showError(err.message);
+        }
+    };
 }

@@ -49,6 +49,15 @@ class MtgoAccountService:
             .first()
         )
 
+    def list_all(
+            self,
+    ) -> list[MtgoAccount]:
+        return (
+            self.db.query(MtgoAccount)
+            .order_by(MtgoAccount.id)
+            .all()
+        )
+
     def list_active(
             self,
     ) -> list[MtgoAccount]:
